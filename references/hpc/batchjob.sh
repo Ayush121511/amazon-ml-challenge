@@ -1,6 +1,6 @@
 #!/bin/sh
 #PBS -N amlc_train
-#PBS -P {PROJECT_NAME}
+#PBS -P scai
 #PBS -q standard
 #PBS -m bea
 #PBS -M {kerberos_id}@iitd.ac.in

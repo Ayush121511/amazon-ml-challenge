@@ -3,6 +3,7 @@
 Kerberos ID: `{kerberos_id}`
 Faculty supervisor: `raunakbh`
 Program: mtech (PROGRAM_CODE 62)
+Project name: `scai`
 
 ## 1. Account creation
 1. Apply: https://userm.iitd.ernet.in/usermanage/hpc.html
@@ -51,14 +52,14 @@ pip install -r requirements.txt
 ## 5. Interactive GPU job (for dev/debug)
 ```
 tmux new -s amlc      # survives dropped connections
-qsub -I -P {PROJECT_NAME} -q standard -N amlc_dev -lselect=1:ncpus=1:ngpus=1:centos=icelake -lwalltime=4:00:00
+qsub -I -P scai -q standard -N amlc_dev -lselect=1:ncpus=1:ngpus=1:centos=icelake -lwalltime=4:00:00
 ```
 - NODE: icelake / skylake / haswell (default haswell)
 - QUEUE: standard (default) / high / scai_q
 - Max walltime 168h, max 10 concurrent jobs, max 2 on scai_q
 
 ## 6. Batch job (for actual training runs)
-Edit `batchjob.sh`: set `{PROJECT_NAME}`, walltime, script path.
+Edit `batchjob.sh`: adjust walltime, script path as needed (project already set to `scai`).
 ```
 qsub references/hpc/batchjob.sh
 qstat -T -u {kerberos_id}          # check status
@@ -82,7 +83,7 @@ Only one session at a time cluster-wide. Compute speed unaffected, only download
 ```
 amgr login
 amgr ls project
-amgr checkbalance project -n {PROJECT_NAME}
+amgr checkbalance project -n scai
 ```
 
 ## Reference
