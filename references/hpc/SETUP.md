@@ -16,7 +16,8 @@ Program: mtech (PROGRAM_CODE 62)
 
 ## 2. Connect via VSCode
 1. Bottom-left green Remote button → "Connect to Host" → "Add New SSH Host"
-2. `ssh {kerberos_id}@login1.hpc.iitd.ac.in`
+2. `ssh {kerberos_id}@login1.hpc.iitd.ernet.in`
+   (note: `.ernet.in` domain, not `.ac.in` — the latter doesn't resolve)
 3. Enter Kerberos password when prompted, then connect.
 
 You land on a **login node** — never run compute here (30 warnings = account ban).
