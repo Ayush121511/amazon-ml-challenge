@@ -16,8 +16,11 @@ Program: mtech (PROGRAM_CODE 62)
 
 ## 2. Connect via VSCode
 1. Bottom-left green Remote button → "Connect to Host" → "Add New SSH Host"
-2. `ssh {kerberos_id}@login1.hpc.iitd.ernet.in`
-   (note: `.ernet.in` domain, not `.ac.in` — the latter doesn't resolve)
+2. `ssh -X {kerberos_id}@hpc.iitd.ac.in`
+   (official CPU login host per supercomputing.iitd.ac.in; `-X` enables X11 forwarding)
+   - GPU nodes directly: `gpu.hpc.iitd.ac.in`
+   - Mic/Xeon Phi nodes: `mic.hpc.iitd.ac.in`
+   - `login1.hpc.iitd.ernet.in` also resolves but is likely an older/internal alias — prefer `hpc.iitd.ac.in`
 3. Enter Kerberos password when prompted, then connect.
 
 You land on a **login node** — never run compute here (30 warnings = account ban).
