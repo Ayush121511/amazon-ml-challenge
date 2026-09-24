@@ -4,6 +4,7 @@ Kerberos ID: `{kerberos_id}`
 Faculty supervisor: `raunakbh`
 Program: mtech (PROGRAM_CODE 62)
 Project name: `scai`
+GPU queue: `scai_q` — NVIDIA A100 80GB PCIe, CUDA 13.2, driver 595.71.05, max 2 concurrent jobs/user
 
 ## 1. Account creation
 1. Apply: https://userm.iitd.ernet.in/usermanage/hpc.html
@@ -37,10 +38,19 @@ You land on a **login node** — never run compute here (30 warnings = account b
    ```
 5. Verify: `wget google.com`
 
-## 4. Conda setup
+## 4. Conda setup (Miniconda, installed to scratch not home)
 ```
-wget https://repo.anaconda.com/archive/Anaconda3-2024.06-1-Linux-x86_64.sh
-sh Anaconda3-2024.06-1-Linux-x86_64.sh
+mkdir -p ~/scratch/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
+bash ~/miniconda.sh -b -u -p ~/scratch/miniconda3
+rm ~/miniconda.sh
+~/scratch/miniconda3/bin/conda init bash
+source ~/.bashrc
+```
+Accept Anaconda channel ToS once (needed before first env create):
+```
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 ```
 Then create challenge env:
 ```
@@ -52,11 +62,11 @@ pip install -r requirements.txt
 ## 5. Interactive GPU job (for dev/debug)
 ```
 tmux new -s amlc      # survives dropped connections
-qsub -I -P scai -q standard -N amlc_dev -lselect=1:ncpus=1:ngpus=1:centos=icelake -lwalltime=4:00:00
+qsub -I -P scai -q scai_q -lselect=1:ncpus=1:ngpus=1 -lwalltime=4:00:00
 ```
-- NODE: icelake / skylake / haswell (default haswell)
-- QUEUE: standard (default) / high / scai_q
-- Max walltime 168h, max 10 concurrent jobs, max 2 on scai_q
+- `scai_q` gives NVIDIA A100 80GB — use this queue for the challenge
+- Max walltime 168h, max 10 concurrent jobs total, max 2 on `scai_q`
+- Verify GPU once job starts: `nvidia-smi`
 
 ## 6. Batch job (for actual training runs)
 Edit `batchjob.sh`: adjust walltime, script path as needed (project already set to `scai`).

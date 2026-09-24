@@ -4,8 +4,8 @@
 # tmux new -s amlc
 #
 # Then request job:
-qsub -I -P scai -q standard -N amlc_interactive -lselect=1:ncpus=1:ngpus=1:centos=icelake -lwalltime=4:00:00
+qsub -I -P scai -q scai_q -N amlc_interactive -lselect=1:ncpus=1:ngpus=1 -lwalltime=4:00:00
 
-# NODE options: icelake, skylake, haswell (default haswell)
-# QUEUE options: standard (default), high, scai_q
+# scai_q gives NVIDIA A100 80GB PCIe
 # Never run compute directly on login node.
+# Verify GPU once job starts: nvidia-smi
