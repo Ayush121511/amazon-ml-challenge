@@ -17,3 +17,6 @@ venv/
 .env
 .DS_Store
 submissions/*.csv
+
+# HPC credentials - never commit real Kerberos password
+references/hpc/*.local.sh
