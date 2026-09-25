@@ -25,6 +25,30 @@ reference. In its loss analysis, a perfect matcher over the same candidates woul
 score 0.9996, so blocking costs only 0.04 points; what remains is the matcher
 rejecting some true candidates (1.7 pts) and false matches (0.8 pts).
 
+## Final test submission (v4, 26 Sep 2026)
+
+Model: v4 XGBoost (GPU) on lexical + reverse + dense candidates; decision rule expected-F0.5
+per reference with floor 0.75 (chosen on dev); global target exclusivity.
+
+| | France | India | US | All |
+|---|---:|---:|---:|---:|
+| Test references | 259,452 | 809,986 | 663,106 | **1,732,544** |
+| Candidates per reference | 305.3 | 306.5 | 299.9 | about 304 (about 526M pairs) |
+| Predicted no-match rate | 5.34% | 5.66% | 5.64% | 5.6% (97,110) |
+| Predicted matches per reference | 3.34 | 3.34 | 3.35 | |
+| *Train ground truth* | – | – | – | *5.6% no-match, 3.46 matches* |
+
+France was never seen in training, yet its predicted rates match US/India and the train
+ground truth. The organizer validator passes on both files (all format rules, matches
+within candidates) and `--check-ids` passes on the matching file: see
+`results/final_test/`. The TSVs themselves are not committed (predictions on competition
+data; `candidate_pairs.tsv` is 6.8 GB). On Padum they are in
+`artifacts/submission_v4_final/`.
+
+Re-merging scored shards (for example with a per-country cutoff) takes about 5 min and
+needs about 7 GB of free disk for `candidate_pairs.tsv`:
+`qsub -v MODEL=artifacts/matcher_v4/model_xgb,RUN=<new>,SHARDS=artifacts/full_v4_s0:artifacts/full_v4_s1 padum/merge_test.pbs`
+
 ## How it works
 
 1. **Preprocessing** (`src/preprocess.py`): Unicode-normalised and folded
@@ -98,6 +122,7 @@ Dependencies: `requirements.txt` in this folder.
 | `v1/*` | The same for v1, the baseline |
 | `test_dryrun_v1/report.json` | 100k-reference test dry run: per-country no-match rate / matches, timing |
 | `blocking_sweep_terms64_k200_report.json` | Chosen blocking settings on 2,000 references |
+| `final_test/` | Final test run: per-country prediction stats + organizer validator output (PASS) |
 | `research_samples/` | Shared reference-ID lists (fixed seeds) and the same-sample comparison with the sparse TF-IDF baseline |
 
 ## Not included

@@ -172,7 +172,34 @@ It reports recall and throughput without a target rescan. All 22 local tests
 passed. **Padum benchmark pending**; do not claim its recall or scalability
 until the report is checked.
 
-## Latest (26 Sep, about 01:20): v4 = new best (holdout 0.9731)
+## FINAL (26 Sep, 05:10): validated submission files ready
+
+- `artifacts/submission_v4_final/matching_results.tsv` (97 MB, sha256 6327cae1…, identical to
+  the laptop copy) + `candidate_pairs.tsv` (6.8 GB, no empty rows). **Validator PASS** on both
+  files (all rules + matches within candidates) and `--check-ids` PASS on the matching file.
+- Test per-country predictions: France no-match 5.34% / 3.34 matches per reference, India
+  5.66% / 3.34, US 5.64% / 3.35 (train truth: 5.6% / 3.46). No France cutoff applied.
+- Disk: 100.4 GB (over the 100 GB soft limit, 7-day grace). `full_v4_s0/s1` (7.2 GB) can be
+  removed after the leaderboard score is confirmed (ask the user).
+
+## Earlier (26 Sep, about 05:00): final test files
+
+- **Final test run done:** shards `1066141`/`1066142` scored all 1,732,544 test references
+  with v4 XGBoost (GPU) at about 90-160 references/s per shard. Shard 1 merged at about 03:52.
+  **`matching_results.tsv` was written and passes the organizer validator** (1,732,544 rows;
+  97,110 empty = 5.6%, the same as train's no-match rate). It is at
+  `artifacts/submission_v4/matching_results.tsv` and was downloaded to the laptop
+  (`C:\Users\visha\hackathon\mlchallenge\matching_results.tsv`) for the leaderboard.
+- The `candidate_pairs.tsv` write **hit the 110 GB hard disk quota**. With the user's OK,
+  obsolete items were deleted (v1 train/test indexes, matcher_v1, the cancelled
+  train_reverse, dryrun_v1_t, the partial file; about 16 GB), bringing usage to 94 GB.
+  Re-merge job `1066181` (`merge_test.pbs`, 120 GB RAM, `SHARDS=a:b`) writes both files to
+  `artifacts/submission_v4_final/` and runs the validator twice (both files; then
+  `--check-ids` on the matching file).
+- Ayush (aib262015) asked for the v4 pairs, the XGBoost model and the e5 checkpoint. Read-only
+  ACL commands were given to the user to run; Claude may not grant permissions.
+
+## Earlier (26 Sep, about 01:20): v4 = new best (holdout 0.9731)
 
 - **Dense job `1066089` results:** fine-tune 9 min (loss 3.42 → about 0.002); embedded 24.2M
   records at about 12.5k/s; exact GPU search train + test; GPU stages done 00:12.
@@ -267,7 +294,7 @@ until the report is checked.
 
 Team repo: https://github.com/Ayush121511/amazon-ml-challenge (public; default
 branch `eda`; teammate branch `ayush-progress`). This workstream is on branch
-**`vishal-progress`** (commit `a18a71e`, 25 Sep 2026), entirely inside
+**`vishal-progress`** (v2 commit `a18a71e`, 25 Sep; **v4 commit `9b74a5c`, 26 Sep: embeddings + XGBoost GPU, holdout 0.9731**), entirely inside
 `posting_index_pipeline/`: pipeline code, 42 tests, Padum job scripts, docs and
 aggregate result reports (`results/v1`, `results/v2`, test dry run). No data,
 artifacts or per-record miss files. Superseded experiments were left out. To
