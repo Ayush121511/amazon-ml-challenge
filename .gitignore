@@ -1,6 +1,7 @@
 data/raw/
 data/processed/
 data/external/
+data/student_resource/dataset/
 *.csv
 *.parquet
 *.zip

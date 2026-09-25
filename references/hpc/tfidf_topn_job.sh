@@ -1,0 +1,22 @@
+#!/bin/sh
+#PBS -N amlc_tfidf_topn
+#PBS -P scai
+#PBS -q scai_q
+#PBS -m bea
+#PBS -M {kerberos_id}@iitd.ac.in
+#PBS -l select=1:ncpus=8:ngpus=1:mem=64gb
+#PBS -l walltime=02:00:00
+# CPU-only workload (TF-IDF + sparse_dot_topn blocking); ngpus=1 requested only
+# because scai_q enforces a minimum of 1 GPU per job, not because we use one.
+
+echo "==============================="
+echo $PBS_JOBID
+cat $PBS_NODEFILE
+echo "==============================="
+
+cd $HOME/scratch/AmazonMLChallenge
+
+source $HOME/scratch/miniconda3/bin/activate
+conda activate amlc
+
+python src/run_tfidf_topn_full.py
