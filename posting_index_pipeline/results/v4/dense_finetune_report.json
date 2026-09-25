@@ -1,0 +1,9 @@
+{
+  "references": 400000,
+  "steps": 4000,
+  "batch": 256,
+  "lr": 3e-05,
+  "temperature": 0.05,
+  "excluded_references": 122800,
+  "seconds": 555.2687667123973
+}

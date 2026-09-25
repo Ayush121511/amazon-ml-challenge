@@ -172,6 +172,108 @@ It reports recall and throughput without a target rescan. All 22 local tests
 passed. **Padum benchmark pending**; do not claim its recall or scalability
 until the report is checked.
 
+## Latest (26 Sep, about 01:20): v4 = new best (holdout 0.9731)
+
+- **Dense job `1066089` results:** fine-tune 9 min (loss 3.42 → about 0.002); embedded 24.2M
+  records at about 12.5k/s; exact GPU search train + test; GPU stages done 00:12.
+- **v4 pairs** (same 100k references as v2): **candidate recall 99.88%** (India 99.86, US 99.90)
+  vs v2 94.64%, with only 288 candidates per reference (v2: 223). Text search top 200 with
+  the combined route: 94.57%; + text reverse: 95.16%; + embeddings: 99.88%.
+- **Matchers on v4 pairs:**
+  - **XGBoost on the A100** (`--backend xgboost`, 255 leaves, lr 0.05, best iteration 732,
+    7.5 min, job `1066129`): **dev 0.9756 / holdout 0.9731** (US 0.9749, India 0.9713),
+    expected@0.75. Top gains are all embedding features (dense_rev_inv_rank, dense_score,
+    dense_rev_top1, …). Loss analysis: a perfect matcher would score 0.9996; blocking loss
+    0.04 pts (64 links); the rest is matcher misses (2,674 links, 1.67 pts), false positives 0.57,
+    singleton 0.24.
+  - LightGBM v4 (CPU) reached a similar dev logloss (0.00209, iteration 1942); its job was
+    cancelled for speed before scoring.
+- **XGBoost backend:** `Scorer`/`fit_matcher`/`load_scorer` in `submission_pipeline.py`;
+  wheel `padum/gpu_wheels/xgboost-2.1.4-…manylinux_2_28…whl` (CUDA build, Apache-2.0,
+  installed `--no-deps`).
+- **Final test run (running since about 01:15):** `1066141` (builds `test_index_c`, then
+  shard 0) and `1066142` (waits for the index, then shard 1). Both use `MODEL=matcher_v4/model_xgb`,
+  `DENSE=artifacts/dense_v1`, REVERSE; the second shard to finish merges + validates →
+  `artifacts/submission_v4/`. v2 shards were cancelled (user OK).
+
+## Earlier (25 Sep, about 23:00): dense retrieval (embeddings) on the GPU
+
+- **Why:** the matcher is saturated (a bigger LightGBM gave +0.0001), and lexical blocking
+  gains have plateaued. Fine-tuned multilingual embeddings target cross-script and
+  semantic misses. The user approved running it on Padum (AWS was considered and dropped).
+- **Model:** `intfloat/multilingual-e5-small` (MIT, 118M params) in
+  `models/multilingual-e5-small/` on Padum (sha256 1a55775f…).
+- **Environment:** torch 2.4.1+cu118 + transformers 4.46.3 + the NVIDIA cu11 libs + triton
+  as offline wheels in `padum/gpu_wheels/` (36 files, about 2.8 GB). `pip download
+  --platform` skips Linux-only markers on Windows, so the NVIDIA wheels were fetched
+  separately with `--no-deps`. `dense_chain.pbs` installs them into `.conda-er` if torch
+  is missing.
+- **Code:** `src/dense_retrieval.py`. Stages:
+  - `finetune`: symmetric InfoNCE, in-batch negatives within one country, 400k references
+    excluding the matcher's 100k sample + all earlier samples, 4,000 steps × 256.
+  - `embed`: fp16, original name | address text, targets in index ordinal order.
+  - `search`: exact GPU matmul top-k per country, forward top 50 + reverse top 10.
+  Pipeline: `--dense` adds `Dense`/`merge_dense` candidates and embedding features
+  (emb_cos, gap, rank, dense ranks). 53 tests pass.
+- **Running since 23:01:** `1066089` on scai03 (**A100-SXM4-80GB**, driver 595 / CUDA 13.2, 8 CPUs,
+  64 GB). The first attempt `1066087` failed at install: huggingface-hub 0.36 needs `hf-xet`
+  (a Linux-only marker skipped on Windows). It was replaced by huggingface-hub 0.26.5 and
+  verified with `pip install --dry-run`. v2 shard 0 was cancelled (the user's decision);
+  shard 1 `1066045` keeps running.
+- **Job:** `padum/dense_chain.pbs` (GPU stages → **matcher v4** = v2 + combined route +
+  dense, same 100k references → holdout → `test_index_c`). It is submitted when a slot
+  frees: the user chose to cancel v2 shard 0 at that point (shard 1 `1066045` continues).
+
+## Earlier (25 Sep, about 22:00)
+
+- **Route check done** (`1065959`, 20k of v2's references, 68,948 links): forward recall
+  at top 200 was v2 routes **93.79%** (US 96.84, India 90.74); + phonetic 93.67% (worse:
+  sound-alike candidates crowd out real ones, **dropped**); **+ combined name+address
+  94.56%** (US 97.85, India 91.26; top 50 +1.05, top 100 +1.08); all routes 94.42%.
+  Report: `artifacts/route_check_v1/report.json`.
+- **Bigger LightGBM** (`1065993`, 127 leaves, stopped at 1,237 rounds): holdout
+  **0.9477** vs v2's 0.9476. No gain; the matcher is saturated with the current features.
+- **Decision:** v3 = v2 + combined route (no phonetic, v2's LightGBM settings). Expected
+  gain is modest (+0.3-0.6), since reverse search already recovers some of the same links.
+- **scai_q allows at most 2 jobs per user, queued + running** (a 3rd qsub is rejected).
+  `qsub -v` splits on commas, so the v3 job now takes `ROUTES=name:address:anchor:combined`.
+- 22:00: shard 0 was resubmitted with 2 CPUs as **`1066053` (running on scai02)**, since only
+  2-CPU slots were free; shard 1 `1066045` (4 CPUs) is still queued.
+- **Originally queued:** the v2 full test run as 2 shards (`1066044` `full_v2_s0`, `1066045`
+  `full_v2_s1`, 4 CPUs each) → **the shard that finishes second runs merge + validator**
+  → `artifacts/submission_v2/`, a safe submission file. v3 is submitted when a slot frees:
+  `qsub -v ROUTES=name:address:anchor:combined padum/v3_train_chain.pbs`.
+
+## Earlier (25 Sep, about 20:05): the user delegated "do whatever is best, give final best results"
+
+- **Running:** route check `1065959` (scai02, 2 CPUs); recall results about 21:00.
+- **Queued:** `1065993` `padum/train_big.pbs` retrains v2 K=200 on its saved pairs with
+  127 leaves, lr 0.06, up to 4,000 rounds, early stopping 100 →
+  `artifacts/matcher_v2/model_k200_big` + loss analysis (same holdout as v2).
+- **Ready, not submitted:** `padum/v3_train_chain.pbs` reuses `train_index_c`
+  (from the route check), builds pairs on the same 100k references
+  (`ROUTES=` chooses routes; the model remembers them and predict defaults to
+  them), trains K=200 (`LGB_ARGS=` for the winning LightGBM settings), runs
+  the loss analysis, then builds `test_index_c`.
+- **New:** `--country-threshold` (e.g. `France=0.55`) in predict/merge applies a
+  per-country decision cutoff at merge time without re-scoring. It is for
+  France's under-matching (dry run: 12.2% no-match vs about 5.6% in train). The
+  merge report now lists each country's best-probability quantiles. 52 tests pass.
+- **Plan:** best of {v2, v2-big, v3} on the same holdout → full test run (2
+  shards + merge + validator) → France cutoff decided from the test
+  statistics → submission file.
+
+## Shared on GitHub
+
+Team repo: https://github.com/Ayush121511/amazon-ml-challenge (public; default
+branch `eda`; teammate branch `ayush-progress`). This workstream is on branch
+**`vishal-progress`** (commit `a18a71e`, 25 Sep 2026), entirely inside
+`posting_index_pipeline/`: pipeline code, 42 tests, Padum job scripts, docs and
+aggregate result reports (`results/v1`, `results/v2`, test dry run). No data,
+artifacts or per-record miss files. Superseded experiments were left out. To
+update it, commit the changed files into that folder on the branch; it is not
+merged into `eda`.
+
 ## Posting index workstream (aib262467, parallel)
 
 Details: `POSTING_INDEX_HANDOFF.md` and `business_entity_resolution/POSTING_INDEX.md`.
@@ -319,7 +421,9 @@ shared with `aib262140`.
   false-positive-only 0.58, singleton 0.42. Links: 2,875 of 51,978 missed by
   blocking, 2,603 rejected by the matcher, 629 false matches. **Blocking is now
   the #1 loss.**
-- **Route check** `1065934` (`padum/route_check.pbs`, queued, waiting for a node;
+- Route check `1065934` waited about 45 min for 4 CPUs and was resubmitted with 2 CPUs as
+  **`1065959`, running on scai02 since 19:38** (about 45-50 min).
+- **Route check** (originally `1065934`, `padum/route_check.pbs`;
   experiment `1065895` is on hold so this goes first). It adds a **combined
   name+address route** (`route_text`: one TF-IDF vector over name + address,
   so chain branches that tie on name are separated by address) and the
@@ -331,7 +435,7 @@ shared with `aib262140`.
 - **Decision (user):** judge changes by train holdout F0.5 and run the test
   set only once, with the final model. The 100k test trial `1065793` was
   cancelled.
-- **Learning-curve experiments** (`padum/train_experiments.pbs`, new
+- (Cancelled by the user's decision, 25 Sep about 19:55: low value, and it would take a job slot.) Learning-curve experiments (`padum/train_experiments.pbs`, new
   `train --train-refs/--num-leaves/--learning-rate/--min-data-in-leaf/--early-stopping`):
   `1065895` (queued, waiting for a GPU slot) trains on 25k of v2's training
   references with the same dev/holdout. Variant A uses v2's settings; variant B

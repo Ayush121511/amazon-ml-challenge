@@ -109,6 +109,43 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sorted(col('proxy_rank')[ref0].tolist()), list(range(1, int(ref0.sum()) + 1)))
         self.assertTrue(np.all(col('proxy_gap') <= 1e-6))
 
+    def test_dense_candidates_and_embedding_features(self):
+        from posting_index import country_dir
+        from submission_pipeline import Dense, merge_dense
+        root = self.root / 'dense' / 'test'
+        root.mkdir(parents=True, exist_ok=True)
+        name = country_dir('US')
+        ids = self.index.ids
+        rng = np.random.default_rng(0)
+        targets = rng.normal(size=(len(ids), 8)).astype(np.float32)
+        targets /= np.linalg.norm(targets, axis=1, keepdims=True)
+        same = int(np.flatnonzero(ids == b'S3-same')[0])
+        refs = np.stack([targets[same], -targets[same]]).astype(np.float16)  # S1-1 ~ S3-same
+        np.save(root / f'targets_{name}.npy', targets.astype(np.float16))
+        np.save(root / f'targets_{name}_ids.npy', ids)
+        np.save(root / 's1_vectors.npy', refs)
+        np.save(root / 's1_ids.npy', np.array([b'S1-1', b'S1-2']))
+        np.save(root / 's1_country.npy', np.array([b'US', b'US']))
+        k = 3
+        fwd_ord = np.argsort(-(refs.astype(np.float32) @ targets.T), axis=1)[:, :k].astype(np.int32)
+        rev_ref = np.zeros((len(ids), 1), dtype=np.int32)
+        np.savez(root / f'dense_{name}.npz', ref_ids=np.array([b'S1-1', b'S1-2']),
+                 fwd_score=np.ones((2, k), np.float16), fwd_ord=fwd_ord,
+                 rev_score=np.ones((len(ids), 1), np.float16), rev_ref=rev_ref)
+        dense = Dense(self.root / 'dense', 'test', 'US', ids)
+        c = candidates(self.index, self.rows, top_k=10, top_terms=64, keep=2, threads=1)
+        fwd, rev, vecs = dense.lookup(self.rows)
+        m = merge_dense(c, fwd, rev)
+        keys = set(zip(m['ref'].tolist(), m['ord'].tolist()))
+        self.assertIn((0, same), keys)
+        self.assertEqual(len(rev['ref']), len(ids))  # every target listed S1-1 as its top reference
+        x = features(m, self.rows, self.table, threads=1, ref_vecs=vecs, target_vecs=dense.targets)
+        col = lambda n: x[:, FEATURE_NAMES.index(n)]
+        pick = (m['ref'] == 0) & (m['ord'] == same)
+        self.assertAlmostEqual(float(col('emb_cos')[pick][0]), 1.0, places=2)
+        self.assertEqual(float(col('emb_rank')[pick][0]), 1.0)
+        self.assertTrue(np.isfinite(x).all())
+
     def test_f05_edge_cases(self):
         self.assertEqual(f05(set(), set()), 1.0)
         self.assertEqual(f05(set(), {'a'}), 0.0)
@@ -158,6 +195,17 @@ class PipelineTests(unittest.TestCase):
         stage_train(argparse.Namespace(pairs=pairs, output=small, rounds=20, threads=1, max_rank=2,
                                        train_refs=50, num_leaves=15, learning_rate=0.1,
                                        min_data_in_leaf=10, early_stopping=10))
+        # XGBoost backend (GPU on Padum, CPU here): same interface, model reloads for scoring.
+        xgb_out = self.root / 'model_train_xgb'
+        stage_train(argparse.Namespace(pairs=pairs, output=xgb_out, rounds=30, threads=1, max_rank=2,
+                                       train_refs=0, num_leaves=15, learning_rate=0.1,
+                                       min_data_in_leaf=10, early_stopping=10, backend='xgboost'))
+        xgb_report = json.loads((xgb_out / 'report.json').read_text())
+        self.assertEqual(xgb_report['backend'], 'xgboost')
+        self.assertGreater(xgb_report['macro_f05_holdout'], 0.8)
+        from submission_pipeline import load_scorer
+        probs = load_scorer(xgb_out, 1).predict(np.load(pairs / 'x.npy')[:5])
+        self.assertEqual(probs.shape, (5,))
         small_report = json.loads((small / 'report.json').read_text())
         self.assertEqual(small_report['train_refs_used'], 50)
         self.assertEqual(small_report['references']['holdout'],
@@ -185,7 +233,8 @@ class PipelineTests(unittest.TestCase):
         stage_predict(argparse.Namespace(data=self.root, index=self.index_root, output=out,
                                          split='test', model=model, limit=0, keep=0, top_k=10,
                                          top_terms=64, batch=2, threads=1, sample=0, shard='',
-                                         sample_seed='s', exclusive=True, reverse=None, ref_index=None))
+                                         sample_seed='s', exclusive=True, reverse=None, ref_index=None,
+                                         country_threshold=''))
         tables = {}
         for name in ('matching_results.tsv', 'candidate_pairs.tsv'):
             with open(out / name, encoding='utf-8', newline='') as f:
@@ -208,13 +257,24 @@ class PipelineTests(unittest.TestCase):
             stage_predict(argparse.Namespace(data=self.root, index=self.index_root, output=shard,
                                              split='test', model=model, limit=0, keep=0, top_k=10,
                                              top_terms=64, batch=2, threads=1, sample=0, shard=f'{i}/2',
-                                             sample_seed='s', exclusive=True, reverse=None, ref_index=None))
+                                             sample_seed='s', exclusive=True, reverse=None, ref_index=None,
+                                         country_threshold=''))
             shards.append(shard)
         merged = self.root / 'merged'
         stage_merge(argparse.Namespace(data=self.root, split='test', model=model, shards=shards,
-                                       output=merged, exclusive=True))
+                                       output=merged, exclusive=True, country_threshold=''))
         for name in ('matching_results.tsv', 'candidate_pairs.tsv'):
             self.assertEqual((merged / name).read_text(encoding='utf-8'), (out / name).read_text(encoding='utf-8'))
+        # A per-country cutoff above any probability removes that country's matches only.
+        strict = self.root / 'merged_strict'
+        stage_merge(argparse.Namespace(data=self.root, split='test', model=model, shards=shards,
+                                       output=strict, exclusive=True, country_threshold='US=1.01'))
+        with open(strict / 'matching_results.tsv', encoding='utf-8') as f:
+            rows = {r[0]: r[1] for r in csv.reader(f, delimiter='	')}
+        self.assertEqual(rows['S1-1'] + rows['S1-5'], '')
+        self.assertEqual(rows['S1-3'], tables['matching_results.tsv'] and ','.join(sorted(tables['matching_results.tsv']['S1-3'])))
+        report = json.loads((strict / 'report.json').read_text())
+        self.assertEqual(report['stats']['country_thresholds']['US'], 1.01)
 
 
 if __name__ == '__main__':

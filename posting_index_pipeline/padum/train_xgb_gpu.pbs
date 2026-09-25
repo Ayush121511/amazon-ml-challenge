@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -N er_xgb
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=96gb:centos=amdepyc
+#PBS -l walltime=03:00:00
+#PBS -j oe
+# XGBoost matcher trained on the GPU on saved pairs (same dev/holdout as the LightGBM model),
+# then loss analysis. GPU scoring makes the final 1.73M-reference test run much faster.
+# Usage: qsub -v PAIRS=artifacts/matcher_v4/pairs,OUT=artifacts/matcher_v4/model_xgb padum/train_xgb_gpu.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}" && test -n "${PAIRS:-}" && test -n "${OUT:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"
+"$PY" -c "import xgboost" 2>/dev/null || "$PY" -m pip install --no-index --no-deps padum/gpu_wheels/xgboost-2.1.4-py3-none-manylinux_2_28_x86_64.whl
+"$PY" -c "import xgboost, torch; print('xgboost', xgboost.__version__, 'gpu', torch.cuda.is_available())"
+SRC=business_entity_resolution/src
+/usr/bin/time -v "$PY" -u $SRC/submission_pipeline.py train --pairs "$PAIRS" --output "$OUT" --max-rank 200 \
+  --backend xgboost --rounds 4000 --num-leaves 255 --learning-rate 0.05 --early-stopping 100 --threads "$N"
+"$PY" -u $SRC/analyze_matcher_loss.py --pairs "$PAIRS" --model "$OUT" --output "$OUT/loss_analysis"

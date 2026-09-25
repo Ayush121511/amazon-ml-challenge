@@ -13,7 +13,6 @@ from submission_pipeline import decide, f05
 
 
 def main():
-    import lightgbm as lgb
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--pairs', type=Path, required=True)
     p.add_argument('--model', type=Path, required=True)
@@ -39,7 +38,8 @@ def main():
     keep = model_report['keep']
     rank = x[:, names.index('fused_rank')]
     idx = np.flatnonzero(np.array([part(s) == a.partition for s in pair_ref]) & (rank <= keep))
-    booster = lgb.Booster(model_file=str(a.model / 'model.txt'))
+    from submission_pipeline import load_scorer
+    booster = load_scorer(a.model, 8)
     columns = [names.index(n) for n in model_report['features']]
     prob = booster.predict(x[idx][:, columns])
     ref_idx = np.array([position[s] for s in pair_ref[idx]])

@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from posting_index import CountryIndex, load_manifest, raw_counts, route_text, weigh, ROUTES, records
+from posting_index import CountryIndex, country_dir, load_manifest, raw_counts, route_text, weigh, ROUTES, records
 from transliterate import phonetic, transliterate
 
 TARGET_FIELDS = ('entity_id', 'name_norm', 'name_folded', 'address_folded',
@@ -147,6 +147,85 @@ def merge_reverse(c, rev):
     return out
 
 
+class Dense:
+    """Embedding retrieval results + vectors for one split and country (dense_retrieval.py)."""
+
+    def __init__(self, root, split, country, table_ids):
+        base = Path(root) / split
+        name = country_dir(country)
+        self.ok = (base / f'dense_{name}.npz').exists()
+        if not self.ok:
+            return
+        ids = np.load(base / f'targets_{name}_ids.npy')
+        if len(ids) != len(table_ids) or not np.array_equal(ids, np.asarray(table_ids, dtype=ids.dtype)):
+            raise ValueError(f'{country}: dense target vectors do not match index ordinals')
+        self.targets = np.load(base / f'targets_{name}.npy')
+        d = np.load(base / f'dense_{name}.npz')
+        self.ref_ids = d['ref_ids']
+        self.position = {r.decode(): i for i, r in enumerate(self.ref_ids)}
+        s1_ids = np.load(base / 's1_ids.npy')
+        s1_rows = {r: i for i, r in enumerate(s1_ids)}
+        s1 = np.load(base / 's1_vectors.npy', mmap_mode='r')
+        self.refs = np.asarray(s1[[s1_rows[r] for r in self.ref_ids]])
+        self.fwd_score, self.fwd_ord = d['fwd_score'], d['fwd_ord']
+        rev_ref, rev_score = d['rev_ref'], d['rev_score']
+        n_t, k = rev_ref.shape
+        flat_ref = rev_ref.ravel()
+        order = np.argsort(flat_ref, kind='stable')
+        self.rev_t = np.repeat(np.arange(n_t), k)[order]
+        self.rev_rank = np.tile(np.arange(1, k + 1), n_t)[order]
+        self.rev_score = rev_score.ravel()[order]
+        self.rev_bounds = np.searchsorted(flat_ref[order], np.arange(len(self.ref_ids) + 1))
+
+    def lookup(self, rows):
+        """Forward and reverse dense candidates, plus each row's reference vector."""
+        fwd = {'ref': [], 't_ord': [], 'rank': [], 'score': []}
+        rev = {'ref': [], 't_ord': [], 'rank': [], 'score': []}
+        vecs = np.zeros((len(rows), self.targets.shape[1]), dtype=np.float32)
+        for i, row in enumerate(rows):
+            n = self.position.get(row['entity_id'])
+            if n is None:
+                continue
+            vecs[i] = self.refs[n]
+            k = self.fwd_ord.shape[1]
+            fwd['ref'].append(np.full(k, i)); fwd['t_ord'].append(self.fwd_ord[n])
+            fwd['rank'].append(np.arange(1, k + 1)); fwd['score'].append(self.fwd_score[n])
+            lo, hi = self.rev_bounds[n], self.rev_bounds[n + 1]
+            rev['ref'].append(np.full(hi - lo, i)); rev['t_ord'].append(self.rev_t[lo:hi])
+            rev['rank'].append(self.rev_rank[lo:hi]); rev['score'].append(self.rev_score[lo:hi])
+        cat = lambda d: {k: (np.concatenate(v) if v else np.zeros(0)) for k, v in d.items()}
+        return cat(fwd), cat(rev), vecs
+
+
+def merge_source(c, src, fields):
+    """Union candidates `c` with another source (ref, t_ord, ...); fields maps new name -> src key."""
+    key_c = (c['ref'].astype(np.int64) << 32) | c['ord'].astype(np.int64)
+    key_s = ((src['ref'].astype(np.int64) << 32) | src['t_ord'].astype(np.int64)) if len(src['ref']) \
+        else np.zeros(0, np.int64)
+    keys = np.union1d(key_c, key_s)
+    out = {'ref': keys >> 32, 'ord': keys & 0xFFFFFFFF, 'top': c['top']}
+    ci = np.searchsorted(keys, key_c)
+    for k, v in c.items():
+        if k in ('ref', 'ord', 'top'):
+            continue
+        out[k] = np.zeros(len(keys), dtype=v.dtype)
+        out[k][ci] = v
+    si = np.searchsorted(keys, key_s)
+    for name, key in fields.items():
+        out[name] = np.zeros(len(keys), dtype=np.float32)
+        if len(key_s):
+            out[name][si] = src[key]
+    return out
+
+
+DENSE_FIELDS = ('dense_rank', 'dense_score', 'dense_rev_rank', 'dense_rev_score')
+
+
+def merge_dense(c, fwd, rev):
+    c = merge_source(c, fwd, {'dense_rank': 'rank', 'dense_score': 'score'})
+    return merge_source(c, rev, {'dense_rev_rank': 'rank', 'dense_rev_score': 'score'})
+
+
 # ------------------------------------------------------------ features ----
 
 FEATURE_NAMES = []
@@ -199,7 +278,32 @@ def group_features(cols, ref, n_refs, target_field, threads):
         cols[f'anchor{j}_proxy'] = np.where(valid, proxy[safe], -1.0)
 
 
-def features(cands, rows, table, threads):
+def embedding_features(cols, cands, ref, ord_, n_refs, ref_vecs, target_vecs):
+    """Cosine of the fine-tuned multilingual embeddings for every pair (any script), plus
+    its gap/rank within the reference and the dense-retrieval ranks."""
+    n = len(ref)
+    emb = np.zeros(n, dtype=np.float32)
+    if ref_vecs is not None:
+        for lo in range(0, n, 200000):
+            hi = min(n, lo + 200000)
+            emb[lo:hi] = np.einsum('ij,ij->i', ref_vecs[ref[lo:hi]],
+                                   target_vecs[ord_[lo:hi]].astype(np.float32))
+    cols['emb_cos'] = emb
+    cols['emb_gap'] = emb - _group_max(emb, ref, n_refs)
+    order = np.lexsort((-emb, ref))
+    sorted_ref = ref[order]
+    rank = np.empty(n, dtype=np.int32)
+    rank[order] = np.arange(n) - np.searchsorted(sorted_ref, sorted_ref, side='left') + 1
+    cols['emb_rank'] = rank
+    for k in DENSE_FIELDS:
+        cols[k] = cands[k] if k in cands else np.zeros(n, np.float32)
+    cols['dense_inv_rank'] = np.where(cols['dense_rank'] > 0, 1.0 / np.maximum(cols['dense_rank'], 1), 0.0)
+    cols['dense_rev_inv_rank'] = np.where(cols['dense_rev_rank'] > 0,
+                                          1.0 / np.maximum(cols['dense_rev_rank'], 1), 0.0)
+    cols['dense_rev_top1'] = cols['dense_rev_rank'] == 1
+
+
+def features(cands, rows, table, threads, ref_vecs=None, target_vecs=None):
     """Label-free pair features; column order is FEATURE_NAMES."""
     from rapidfuzz import fuzz
     from rapidfuzz.distance import JaroWinkler
@@ -270,6 +374,7 @@ def features(cands, rows, table, threads):
     cols['ref_name_non_ascii'] = np.fromiter((not x.isascii() for x in a), dtype=bool, count=len(a))
     cols['target_source3'] = table.source3[ord_]
     group_features(cols, ref, n_refs, lambda f: table.fields[f][ord_], threads)
+    embedding_features(cols, cands, ref, ord_, n_refs, ref_vecs, target_vecs)
     if not FEATURE_NAMES:  # pairs stage: every feature; predict: the model's own list
         FEATURE_NAMES[:] = list(cols)
     missing = [n for n in FEATURE_NAMES if n not in cols]
@@ -298,23 +403,33 @@ def generate(index_root, data_dir, split, refs, args, on_chunk):
         if getattr(args, 'reverse', None):
             from reverse_index import Reverse
             reverse = Reverse(args.reverse, args.ref_index, manifest['countries'][country]['dir'], country)
+        dense = None
+        if getattr(args, 'dense', None):
+            dense = Dense(args.dense, split, country, index.ids)
+            dense = dense if dense.ok else None
         timing[f'load_{country}'] += time.monotonic() - t
         for start in range(0, len(rows), args.batch):
             batch = rows[start:start + args.batch]
             t = time.monotonic()
-            cands = candidates(index, batch, args.top_k, args.top_terms, args.keep, args.threads)
+            cands = candidates(index, batch, args.top_k, args.top_terms, args.keep, args.threads,
+                               routes=route_list(getattr(args, 'routes', '')))
             if reverse is not None:
                 cands = merge_reverse(cands, reverse.lookup(batch))
+            ref_vecs = None
+            if dense is not None:
+                fwd, rev, ref_vecs = dense.lookup(batch)
+                cands = merge_dense(cands, fwd, rev)
             timing['block'] += time.monotonic() - t
             t = time.monotonic()
-            x = features(cands, batch, table, args.threads) if len(cands['ref']) else None
+            x = features(cands, batch, table, args.threads, ref_vecs,
+                         dense.targets if dense is not None else None) if len(cands['ref']) else None
             timing['features'] += time.monotonic() - t
             t = time.monotonic()
             on_chunk(batch, cands, x, table)
             timing['consume'] += time.monotonic() - t
             print(f'{country}: {start + len(batch):,}/{len(rows):,} references; '
                   f'{dict((k, round(v)) for k, v in timing.items())}', flush=True)
-        del index, table
+        del index, table, dense
     return dict(timing)
 
 
@@ -452,8 +567,80 @@ def macro_score(ref_names, ref_idx, targets, mask, gold):
     return float(np.mean([f05(gold[name], pred.get(i, set())) for i, name in enumerate(ref_names)]))
 
 
-def stage_train(a):
+class Scorer:
+    """One interface for the two matcher backends: LightGBM (CPU) and XGBoost (GPU if present)."""
+
+    def __init__(self, backend, booster, threads=8, iteration_range=None):
+        self.backend, self.booster, self.threads = backend, booster, threads
+        self.iteration_range = iteration_range
+
+    def predict(self, x):
+        if self.backend == 'xgboost':
+            kwargs = {'iteration_range': self.iteration_range} if self.iteration_range else {}
+            return np.asarray(self.booster.inplace_predict(x, **kwargs), dtype=np.float64)
+        return self.booster.predict(x, num_threads=self.threads)
+
+    def save(self, directory):
+        if self.backend == 'xgboost':
+            self.booster.save_model(str(directory / 'model.json'))
+        else:
+            self.booster.save_model(str(directory / 'model.txt'))
+
+    def gain(self, names):
+        if self.backend == 'xgboost':
+            score = self.booster.get_score(importance_type='total_gain')
+            return {n: round(float(score.get(n, 0.0)), 1) for n in names}
+        return dict(zip(names, self.booster.feature_importance('gain').round(1).tolist()))
+
+
+def gpu_available():
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except Exception:
+        return False
+
+
+def load_scorer(model_dir, threads):
+    report = json.loads((model_dir / 'report.json').read_text())
+    if report.get('backend') == 'xgboost':
+        import xgboost as xgb
+        booster = xgb.Booster()
+        booster.load_model(str(model_dir / 'model.json'))
+        booster.set_param({'device': 'cuda' if gpu_available() else 'cpu', 'nthread': threads})
+        return Scorer('xgboost', booster, threads, (0, report['best_iteration'] + 1))
     import lightgbm as lgb
+    return Scorer('lightgbm', lgb.Booster(model_file=str(model_dir / 'model.txt')), threads)
+
+
+def fit_matcher(a, x_train, y_train, x_dev, y_dev, names):
+    """Returns (scorer, params, best_iteration)."""
+    if getattr(a, 'backend', 'lightgbm') == 'xgboost':
+        import xgboost as xgb
+        device = 'cuda' if gpu_available() else 'cpu'
+        params = dict(objective='binary:logistic', eval_metric='logloss', tree_method='hist',
+                      device=device, grow_policy='lossguide', max_depth=0, max_leaves=a.num_leaves,
+                      learning_rate=a.learning_rate, subsample=0.8, colsample_bytree=0.8,
+                      reg_lambda=5.0, min_child_weight=1.0, max_bin=256, seed=2026, nthread=a.threads)
+        train_set = xgb.QuantileDMatrix(x_train, y_train, feature_names=names)
+        dev_set = xgb.QuantileDMatrix(x_dev, y_dev, ref=train_set, feature_names=names)
+        booster = xgb.train(params, train_set, num_boost_round=a.rounds, evals=[(dev_set, 'dev')],
+                            early_stopping_rounds=a.early_stopping, verbose_eval=100)
+        best = booster.best_iteration
+        return Scorer('xgboost', booster, a.threads, (0, best + 1)), params, best
+    import lightgbm as lgb
+    params = dict(objective='binary', learning_rate=a.learning_rate, num_leaves=a.num_leaves,
+                  min_data_in_leaf=a.min_data_in_leaf,
+                  feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambda_l2=5.0,
+                  num_threads=a.threads, verbose=-1, seed=2026)
+    train_set = lgb.Dataset(x_train, y_train, feature_name=names, free_raw_data=False)
+    dev_set = lgb.Dataset(x_dev, y_dev, reference=train_set)
+    booster = lgb.train(params, train_set, num_boost_round=a.rounds, valid_sets=[dev_set],
+                        callbacks=[lgb.early_stopping(a.early_stopping), lgb.log_evaluation(100)])
+    return Scorer('lightgbm', booster, a.threads), params, booster.best_iteration
+
+
+def stage_train(a):
     started = time.monotonic()
     report_in = json.loads((a.pairs / 'report.json').read_text())
     names = report_in['features']
@@ -490,20 +677,13 @@ def stage_train(a):
     pair_part = np.array([partition[s] for s in pair_ref], dtype=object)
     in_range = (x[:, names.index('fused_rank')] <= a.max_rank) if a.max_rank else np.ones(len(y), bool)
     m = {p: (pair_part == p) & in_range for p in ('train', 'dev', 'holdout')}
-    params = dict(objective='binary', learning_rate=a.learning_rate, num_leaves=a.num_leaves,
-                  min_data_in_leaf=a.min_data_in_leaf,
-                  feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambda_l2=5.0,
-                  num_threads=a.threads, verbose=-1, seed=2026)
-    train_set = lgb.Dataset(x[m['train']], y[m['train']], feature_name=names, free_raw_data=False)
-    dev_set = lgb.Dataset(x[m['dev']], y[m['dev']], reference=train_set)
-    booster = lgb.train(params, train_set, num_boost_round=a.rounds, valid_sets=[dev_set],
-                        callbacks=[lgb.early_stopping(a.early_stopping), lgb.log_evaluation(100)])
+    scorer, params, best_iteration = fit_matcher(a, x[m['train']], y[m['train']], x[m['dev']], y[m['dev']], names)
 
     def evaluate(p, rules):
         refs = sorted(s for s in gold if partition[s] == p)
         position = {s: i for i, s in enumerate(refs)}
         idx = np.flatnonzero(m[p])
-        prob = booster.predict(x[idx], num_threads=a.threads)
+        prob = scorer.predict(x[idx])
         ref_idx = np.array([position[s] for s in pair_ref[idx]])
         return {(rule, t): macro_score(refs, ref_idx, pair_target[idx], decide(ref_idx, prob, rule, t, len(refs)),
                                        gold)
@@ -520,7 +700,7 @@ def stage_train(a):
         position = {s: i for i, s in enumerate(refs)}
         idx = np.flatnonzero(m['holdout'])
         ref_idx = np.array([position[s] for s in pair_ref[idx]])
-        chosen = decide(ref_idx, booster.predict(x[idx], num_threads=a.threads), best[0], best[1], len(refs))
+        chosen = decide(ref_idx, scorer.predict(x[idx]), best[0], best[1], len(refs))
         pred = defaultdict(set)
         for i, t in zip(ref_idx[chosen], pair_target[idx][chosen]):
             pred[i].add(t)
@@ -529,17 +709,19 @@ def stage_train(a):
             scores[countries[s]].append(f05(gold[s], pred.get(i, set())))
         by_country = {c: {'references': len(v), 'macro_f05': float(np.mean(v))} for c, v in sorted(scores.items())}
     a.output.mkdir(parents=True)
-    booster.save_model(str(a.output / 'model.txt'))
-    importance = dict(zip(names, booster.feature_importance('gain').round(1).tolist()))
+    scorer.save(a.output)
+    importance = scorer.gain(names)
     keep = a.max_rank or int(report_in['parameters']['keep'])
     report = {'decision': {'rule': best[0], 'threshold': best[1]}, 'keep': keep,
+              'routes': report_in['parameters'].get('routes', ''),
               'macro_f05_dev': dev[best], 'macro_f05_holdout': holdout,
               'holdout_by_country': by_country,
               'dev_grid': {f'{r}@{t}': v for (r, t), v in sorted(dev.items())},
               'references': dict(Counter(partition.values())),
               'pairs': {p: int(v.sum()) for p, v in m.items()},
-              'best_iteration': booster.best_iteration, 'features': names,
-              'lightgbm_params': {k: v for k, v in params.items() if k != 'num_threads'},
+              'best_iteration': best_iteration, 'features': names,
+              'backend': getattr(a, 'backend', 'lightgbm'),
+              'lightgbm_params': {k: v for k, v in params.items() if k not in ('num_threads', 'nthread')},
               'train_refs_used': int(sum(q == 'train' for q in partition.values())),
               'feature_gain': dict(sorted(importance.items(), key=lambda kv: -kv[1])),
               'candidate_recall': report_in['candidate_recall'],
@@ -553,13 +735,13 @@ def stage_train(a):
 # ----------------------------------------------------------- stage: predict ----
 
 def stage_predict(a):
-    import lightgbm as lgb
     started = time.monotonic()
     model_report = json.loads((a.model / 'report.json').read_text())
-    booster = lgb.Booster(model_file=str(a.model / 'model.txt'))
+    booster = load_scorer(a.model, a.threads)
     rule, threshold = model_report['decision']['rule'], model_report['decision']['threshold']
     FEATURE_NAMES[:] = model_report['features']
     a.keep = a.keep or model_report['keep']
+    a.routes = getattr(a, 'routes', '') or model_report.get('routes', '')
     refs = list(records(a.data / f'{a.split}_source1.tsv.gz'))
     if a.limit:
         refs = refs[:a.limit]
@@ -579,7 +761,7 @@ def stage_predict(a):
         if cands is None or x is None:
             stats['refs_without_candidates'] += len(batch)
             return
-        prob = booster.predict(x, num_threads=a.threads).astype(np.float32)
+        prob = booster.predict(x).astype(np.float32)
         ids = table.fields['entity_id'][cands['ord']]
         bounds = np.searchsorted(cands['ref'], np.arange(len(batch) + 1))  # grouped by ref
         for i, r in enumerate(batch):
@@ -608,7 +790,8 @@ def stage_predict(a):
              'seconds': time.monotonic() - started, 'parameters': params}, indent=2))
         return
     finalize(refs, cands_out, ref_idx, target, prob, model_report, a.exclusive, a.output, stats,
-             {'split': a.split, 'timing': timing, 'started': started, 'parameters': params})
+             {'split': a.split, 'timing': timing, 'started': started, 'parameters': params},
+             parse_country_thresholds(a.country_threshold))
 
 
 def stage_merge(a):
@@ -636,11 +819,24 @@ def stage_merge(a):
     a.output.mkdir(parents=True)
     finalize(refs, cands_out, ref_idx, target, prob, model_report, a.exclusive, a.output, stats,
              {'split': a.split, 'shards': [str(s) for s in a.shards], 'started': started,
-              'parameters': {k: str(v) for k, v in vars(a).items()}})
+              'parameters': {k: str(v) for k, v in vars(a).items()}},
+             parse_country_thresholds(a.country_threshold))
 
 
-def finalize(refs, cands_out, ref_idx, target, prob, model_report, exclusive, output, stats, extra):
+def route_list(text):
+    """'name,address,combined' -> tuple; empty means every route the index has."""
+    return tuple(r for r in text.split(',') if r) if text else None
+
+
+def parse_country_thresholds(text):
+    """'France=0.5,India=0.6' -> {'France': 0.5, 'India': 0.6}."""
+    return {k: float(v) for k, v in (item.split('=') for item in text.split(',') if item)} if text else {}
+
+
+def finalize(refs, cands_out, ref_idx, target, prob, model_report, exclusive, output, stats, extra,
+             country_thresholds=None):
     rule, threshold = model_report['decision']['rule'], model_report['decision']['threshold']
+    country_thresholds = country_thresholds or {}
     if exclusive and len(prob):
         # Ground truth links each target to at most one reference: the most probable one keeps it.
         # Exactly one winner per target; ties (e.g. duplicate references) go to the lowest ref index.
@@ -653,7 +849,22 @@ def finalize(refs, cands_out, ref_idx, target, prob, model_report, exclusive, ou
         stats['exclusivity_zeroed_pairs'] = int(losers.sum())
         stats['exclusivity_zeroed_pairs_above_threshold'] = int((losers & (prob >= threshold)).sum())
         prob = np.where(losers, 0.0, prob).astype(np.float32)
-    chosen = decide(ref_idx, prob, rule, threshold, len(refs))
+    ref_country = np.array([r['country'] for r in refs], dtype=object)
+    pair_country = ref_country[ref_idx] if len(ref_idx) else np.zeros(0, object)
+    chosen = np.zeros(len(prob), dtype=bool)
+    for country in sorted(set(ref_country)):
+        m = pair_country == country
+        if m.any():  # A per-country cutoff overrides the dev-chosen one (label-free calibration).
+            chosen[m] = decide(ref_idx[m], prob[m], rule, country_thresholds.get(country, threshold), len(refs))
+    # Per-country spread of each reference's best probability, to guide such cutoffs.
+    best = np.zeros(len(refs), dtype=np.float32)
+    if len(prob):
+        np.maximum.at(best, ref_idx, prob)
+    stats['best_prob_quantiles'] = {
+        country: {q: float(np.quantile(best[ref_country == country], float(q)))
+                  for q in ('0.05', '0.1', '0.25', '0.5')}
+        for country in sorted(set(ref_country))}
+    stats['country_thresholds'] = {c: country_thresholds.get(c, threshold) for c in sorted(set(ref_country))}
     selected = defaultdict(list)
     for i, t in zip(ref_idx[chosen], target[chosen]):
         selected[i].append(t)
@@ -707,6 +918,8 @@ def main():
                        help='Fused candidates per reference (pairs: required; predict: default = model keep)')
         s.add_argument('--batch', type=int, default=4096)
         s.add_argument('--threads', type=int, default=8)
+        s.add_argument('--routes', default='', help='Comma list of index routes to use (default: all; '
+                       'predict: the routes the model was trained with)')
     s = sub.choices['pairs']
     s.add_argument('--gold', type=Path, required=True)
     s.add_argument('--per-country', type=int, default=30000)
@@ -721,6 +934,7 @@ def main():
     s.add_argument('--no-exclusive', dest='exclusive', action='store_false',
                    help='Do not restrict each target to its most probable reference')
     s.add_argument('--shard', default='', help='i/n: score every n-th reference from i; finish with `merge`')
+    s.add_argument('--country-threshold', default='', help='Per-country decision cutoffs, e.g. France=0.5')
     s = sub.add_parser('merge')
     s.add_argument('--data', type=Path, required=True)
     s.add_argument('--split', choices=['train', 'test'], default='test')
@@ -728,10 +942,12 @@ def main():
     s.add_argument('--shards', type=Path, nargs='+', required=True)
     s.add_argument('--output', type=Path, required=True)
     s.add_argument('--no-exclusive', dest='exclusive', action='store_false')
+    s.add_argument('--country-threshold', default='', help='Per-country decision cutoffs, e.g. France=0.5')
     for name in ('pairs', 'predict'):
         s = sub.choices[name]
         s.add_argument('--ref-index', type=Path, help='Source 1 posting index (reverse blocking)')
         s.add_argument('--reverse', type=Path, help='reverse_index.py output for this split')
+        s.add_argument('--dense', type=Path, help='dense_retrieval.py output root (embedding candidates + vectors)')
     s = sub.add_parser('train')
     s.add_argument('--pairs', type=Path, required=True)
     s.add_argument('--output', type=Path, required=True)
@@ -742,6 +958,8 @@ def main():
     s.add_argument('--learning-rate', type=float, default=0.05)
     s.add_argument('--min-data-in-leaf', type=int, default=100)
     s.add_argument('--early-stopping', type=int, default=50)
+    s.add_argument('--backend', choices=['lightgbm', 'xgboost'], default='lightgbm',
+                   help='xgboost trains/scores on the GPU when one is available')
     s.add_argument('--threads', type=int, default=8)
     a = p.parse_args()
     if a.stage == 'pairs' and a.keep < 1:

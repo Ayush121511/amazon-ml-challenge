@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -N er_dense
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=64gb:centos=amdepyc
+#PBS -l walltime=12:00:00
+#PBS -j oe
+# v4 = v2 + combined route + dense retrieval (fine-tuned multilingual-e5-small, MIT, 118M params).
+# GPU: fine-tune -> embed train/test -> exact top-k search. CPU: pairs on the SAME 100k references
+# as v2 (seed matcher-v2) -> train K=200 -> loss analysis -> test index with the combined route.
+# Usage: qsub padum/dense_chain.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 TOKENIZERS_PARALLELISM=true
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-4}"; W=$(( N > 1 ? N - 1 : 1 ))
+SRC=business_entity_resolution/src
+PIDX=artifacts/posting_index_v1
+PREV=$PIDX/previous_samples
+DENSE=artifacts/dense_v1
+GOLD=6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv
+nvidia-smi
+"$PY" -c "import torch, transformers" 2>/dev/null || "$PY" -m pip install --no-index --find-links padum/gpu_wheels torch transformers
+"$PY" -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0)); x=torch.randn(4096,384,device='cuda',dtype=torch.float16); print((x@x.T).float().mean().item())"
+(cd business_entity_resolution && "$PY" -m unittest discover -s tests)
+EXCL="--exclude-ids artifacts/matcher_v2/pairs/reference_ids.txt --exclude-ids $PREV/retrieval_v1_ids.txt --exclude-ids $PREV/sparse_fullpool_ids.txt --exclude-ids $PREV/selective_index_v1_ids.txt --exclude-ids $PIDX/train_query_10000/reference_ids.txt"
+test -e $DENSE/model || "$PY" -u $SRC/dense_retrieval.py finetune --data artifacts/preprocessed_v2/train \
+  --model models/multilingual-e5-small --output $DENSE --gold $GOLD $EXCL --refs 400000 --batch 256 --max-steps 4000
+for SPLIT in train test; do
+  test -e $DENSE/$SPLIT/s1_ids.npy || "$PY" -u $SRC/dense_retrieval.py embed --data artifacts/preprocessed_v2/$SPLIT \
+    --model $DENSE/model --output $DENSE --split $SPLIT --batch 1024
+  test -e $DENSE/$SPLIT/search_report.json || "$PY" -u $SRC/dense_retrieval.py search --data artifacts/preprocessed_v2/$SPLIT \
+    --output $DENSE --split $SPLIT --forward-k 50 --reverse-k 10
+done
+echo "GPU stages done: $(date)"
+OUT=artifacts/matcher_v4
+/usr/bin/time -v "$PY" -u $SRC/submission_pipeline.py pairs \
+  --data artifacts/preprocessed_v2/train --index $PIDX/train_index_c --routes name,address,anchor,combined \
+  --ref-index $PIDX/train_ref_index --reverse $PIDX/train_reverse_t --dense $DENSE \
+  --output $OUT/pairs --gold $GOLD --per-country 50000 --seed matcher-v2 \
+  --top-k 200 --top-terms 64 --keep 200 --threads "$N" \
+  --exclude-ids $PREV/retrieval_v1_ids.txt --exclude-ids $PREV/sparse_fullpool_ids.txt \
+  --exclude-ids $PREV/selective_index_v1_ids.txt --exclude-ids $PIDX/train_query_10000/reference_ids.txt
+"$PY" -u $SRC/submission_pipeline.py train --pairs $OUT/pairs --output $OUT/model_k200 \
+  --max-rank 200 --rounds 3000 --threads "$N"
+"$PY" -u $SRC/analyze_matcher_loss.py --pairs $OUT/pairs --model $OUT/model_k200 --output $OUT/model_k200/loss_analysis
+test -e $PIDX/test_index_c || "$PY" -u $SRC/posting_index.py --data artifacts/preprocessed_v2/test \
+  --split test --output $PIDX/test_index_c --workers "$W" --chunk-rows 50000 --max-df-fraction 0.005 --min-max-df 1000
+echo "All done: $(date)"

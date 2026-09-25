@@ -2,7 +2,7 @@
 #PBS -N er_predict
 #PBS -P scai
 #PBS -q scai_q
-#PBS -l select=1:ncpus=8:ngpus=1:mem=32gb:centos=amdepyc
+#PBS -l select=1:ncpus=8:ngpus=1:mem=64gb:centos=amdepyc
 #PBS -l walltime=06:00:00
 #PBS -j oe
 # CPU-only; the GPU is requested only because scai_q requires one per job.
@@ -21,6 +21,14 @@ EXTRA=()
 if [ -n "${SAMPLE:-}" ]; then EXTRA+=(--sample "$SAMPLE"); fi
 if [ -n "${SHARD:-}" ]; then EXTRA+=(--shard "$SHARD"); fi
 if [ -n "${REVERSE:-}" ]; then EXTRA+=(--ref-index $PIDX/test_ref_index --reverse $PIDX/test_reverse_t); fi
+if [ -n "${DENSE:-}" ]; then EXTRA+=(--dense "$DENSE"); fi
+# BUILD_INDEX=1 builds the test index first; WAIT_INDEX=1 waits until another job has built it.
+if [ -n "${BUILD_INDEX:-}" ] && [ ! -e "$PIDX/${INDEX:-test_index_t}" ]; then
+  "$PYTHON" -u business_entity_resolution/src/posting_index.py --data artifacts/preprocessed_v2/test     --split test --output "$PIDX/${INDEX}" --workers $(( ${NCPUS:-8} - 1 )) --chunk-rows 50000     --max-df-fraction 0.005 --min-max-df 1000
+fi
+if [ -n "${WAIT_INDEX:-}" ]; then
+  until [ -f "$PIDX/${INDEX}/manifest.json" ]; do sleep 30; done
+fi
 /usr/bin/time -v "$PYTHON" -u business_entity_resolution/src/submission_pipeline.py predict \
   --data artifacts/preprocessed_v2/test --index $PIDX/${INDEX:-test_index_t} \
   --split test --model "$MODEL" --output "$OUT" --top-k 200 --top-terms 64 --threads 8 "${EXTRA[@]}"
@@ -28,5 +36,17 @@ if [ -z "${SAMPLE:-}" ] && [ -z "${SHARD:-}" ]; then
   SR=6ab10eb3b23ba_student_resource/student_resource
   "$PYTHON" $SR/utils/validate_submission.py --matching "$OUT/matching_results.tsv" \
     --candidate "$OUT/candidate_pairs.tsv" --test-dir $SR/dataset/test --check-ids
+fi
+# Sharded runs: the shard that finishes second merges (global exclusivity + decision) and
+# validates, so no separate merge job is needed (scai_q allows only 2 jobs per user).
+if [ -n "${SHARD:-}" ] && [ -n "${MERGE_RUN:-}" ] && [ -n "${OTHER:-}" ]; then
+  if [ -f "$OTHER/report.json" ] && [ ! -e "artifacts/$MERGE_RUN" ]; then
+    "$PYTHON" -u business_entity_resolution/src/submission_pipeline.py merge       --data artifacts/preprocessed_v2/test --split test --model "$MODEL"       --shards "$OUT" "$OTHER" --output "artifacts/$MERGE_RUN" ${COUNTRY_THRESHOLD:+--country-threshold "$COUNTRY_THRESHOLD"}
+    SR=6ab10eb3b23ba_student_resource/student_resource
+    "$PYTHON" $SR/utils/validate_submission.py --matching "artifacts/$MERGE_RUN/matching_results.tsv"       --candidate "artifacts/$MERGE_RUN/candidate_pairs.tsv" --test-dir $SR/dataset/test --check-ids
+    ls -l "artifacts/$MERGE_RUN"
+  else
+    echo "Other shard not finished yet (or merge exists): it will merge."
+  fi
 fi
 ls -l "$OUT"
