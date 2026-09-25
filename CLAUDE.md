@@ -145,10 +145,48 @@ by the precheck and skipped, because plain Jaccard/MinHash has no IDF-equivalent
 that TF-IDF's weighting avoids entirely. Concrete, data-grounded reason to prefer
 TF-IDF+SimHash over MinHash+LSH on this specific dataset.
 
+**TF-IDF top-N (exact cosine, `sparse_dot_topn`)** — a second way to spend the
+same TF-IDF vectors, safe *by construction* rather than by a post-hoc frequency
+cap: `sp_matmul_topn` never returns more than `top_n` matches per S1 row, so
+output size is hard-bounded at `n_s1_rows * top_n` regardless of data skew — no
+precheck needed the way the hash-bucket approaches (SimHash, MinHash) require.
+Trades exactness of the LSH approximation away (real cosine scores, not
+hash-bucket collisions) for that hard bound. Implementation:
+`src/tfidf_topn_blocking.py`, dev check `src/dev_tfidf_topn_check.py`,
+full-scale runner `src/run_tfidf_topn_full.py` /
+`references/hpc/tfidf_topn_job.sh` (top_n=75). Full-scale numbers: check job
+history / re-run — not yet logged here.
+
+**Production candidate-generation pipeline** (`src/generate_candidates.py`,
+`references/hpc/generate_candidates_job.sh`) — until now, every blocking
+channel above was only ever measured in isolation by its own dev/full-scale
+script; nothing actually produced the `candidate_pairs.tsv` the submission
+format requires. This script is the real union: exact-match (`blocking.py`) ∪
+TF-IDF top-N (`tfidf_topn_blocking.py`, top_n=75 default), deduped per
+S2/S3 source, then grouped per S1 entity into the exact
+`source1_entity_id\tcandidate_entity_ids` (comma-joined S2+S3, empty string
+for zero-candidate entities) format — includes every S1 entity, not just ones
+with hits. `--eval` (train only) prints per-channel recall next to the
+combined recall so the lift from adding TF-IDF top-N on top of exact-match is
+visible in one run instead of cross-referencing separate logs. SimHash is
+deliberately *not* included in this union yet — its full-scale recall was
+still unconfirmed, and it's a probabilistic approximation of the same cosine
+signal TF-IDF top-N computes exactly; add it as a third channel once
+full-scale SimHash numbers justify the extra candidates. Only smoke-tested
+against synthetic fixtures so far (no dataset access in this environment) —
+run `--eval` on the real dev sample / full scale on HPC before trusting the
+combined recall numbers. Fixed a real gap while at it: `requirements.txt` was
+missing `sparse_dot_topn`, `scipy`, `pyarrow`, and `rapidfuzz`, all of which
+production blocking/EDA code already imports — would have failed on any fresh
+environment built strictly from that file (the actual submission
+requirement).
+
 **Not yet built**: entity-level train/val split for leakage-safe evaluation,
 pairwise feature computation at scale (`src/features.py` exists, untested at
 scale), the actual classifier (LightGBM planned) + F_0.5-tuned threshold,
-test-set candidate/match generation, submission validation.
+submission validation. Test-set candidate generation is now wired up
+(`generate_candidates.py --split test`) but untested against the real test
+data (France country coverage, in particular, still unverified end-to-end).
 
 ## HPC operational notes learned the hard way
 - `scai_q` is the **only** queue our `scai` project has quota on — `standard`/
