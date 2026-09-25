@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N er_match_audit
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=4gb:centos=amdepyc
+#PBS -l walltime=00:30:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+.conda-er/bin/python -u business_entity_resolution/src/audit_matcher_errors.py \
+  --data artifacts/pairs_sparse_10k --model artifacts/matcher_sparse_10k \
+  --output artifacts/matcher_sparse_10k_dev_audit

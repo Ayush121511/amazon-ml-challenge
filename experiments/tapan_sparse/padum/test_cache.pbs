@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -N er_test_cache
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=16gb:centos=amdepyc
+#PBS -l walltime=04:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 MKL_NUM_THREADS=4
+if test -f artifacts/test_prototype_v1/cache/manifest.json; then
+  echo 'Completed test cache already exists.'
+else
+  .conda-er/bin/python -u business_entity_resolution/src/test_pipeline.py cache \
+    --data artifacts/preprocessed_v2/test --output artifacts/test_prototype_v1/cache
+fi
