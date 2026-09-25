@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N er_cache_resume
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=16gb:centos=amdepyc
+#PBS -l walltime=03:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 MKL_NUM_THREADS=4
+.conda-er/bin/python -u business_entity_resolution/tests/test_cache_resume.py
+.conda-er/bin/python -u business_entity_resolution/src/resume_test_cache.py \
+  --data artifacts/preprocessed_v2/test --cache artifacts/test_prototype_v1/cache

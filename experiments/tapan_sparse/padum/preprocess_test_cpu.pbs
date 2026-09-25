@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -N er_preprocess_test
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=8gb:centos=amdepyc
+#PBS -l walltime=02:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PYTHON="$PWD/.conda-er/bin/python"
+"$PYTHON" -m unittest discover -s business_entity_resolution/tests -q
+"$PYTHON" -u business_entity_resolution/src/preprocess.py \
+  --data 6ab10eb3b23ba_student_resource/student_resource/dataset \
+  --output artifacts/preprocessed_v2 --split test --workers 3 --resume
+"$PYTHON" - <<'PY'
+import json
+from pathlib import Path
+
+root = Path('artifacts/preprocessed_v2/test')
+expected = {1: 1732544, 2: 4887273, 3: 5082316}
+for source, rows in expected.items():
+    path = root / f'test_source{source}.tsv.gz'
+    manifest = json.loads(Path(str(path) + '.json').read_text())
+    assert manifest['input']['version'] == 2
+    assert manifest['input']['limit'] == 0
+    assert manifest['rows'] == rows
+    assert path.stat().st_size == manifest['output_bytes']
+    print(f'Test source {source}: verified {rows:,} rows', flush=True)
+print('All test v2 manifests passed.', flush=True)
+PY

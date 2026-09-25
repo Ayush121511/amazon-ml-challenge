@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -N er_test_all
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=16:ngpus=1:mem=16gb:centos=amdepyc
+#PBS -l walltime=12:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+test -f artifacts/test_prototype_v1/cache/manifest.json
+test -f artifacts/matcher_sparse_10k/report.json
+# One continuation job avoids submitting three countries plus finalization
+# against the observed per-user queue limit. Completed blocks are reused.
+for country in US France India; do
+  echo "Starting country: $country"
+  COUNTRY="$country" bash padum/test_country.pbs
+done
+bash padum/test_finalize.pbs

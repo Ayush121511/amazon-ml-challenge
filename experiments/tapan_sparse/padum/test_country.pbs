@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -N er_test_country
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=16:ngpus=1:mem=16gb:centos=amdepyc
+#PBS -l walltime=12:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+case "${COUNTRY:-}" in India|US|France) ;; *) echo 'COUNTRY must be India, US, or France'; exit 1 ;; esac
+export OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+.conda-er/bin/python -u business_entity_resolution/src/test_pipeline.py retrieve \
+  --cache artifacts/test_prototype_v1/cache --country "$COUNTRY" \
+  --output "artifacts/test_prototype_v1/retrieval/$COUNTRY" --threads 16
+.conda-er/bin/python -u business_entity_resolution/src/test_pipeline.py score \
+  --cache artifacts/test_prototype_v1/cache \
+  --retrieval "artifacts/test_prototype_v1/retrieval/$COUNTRY" \
+  --model artifacts/matcher_sparse_10k \
+  --output "artifacts/test_prototype_v1/scored/$COUNTRY" --threads 16

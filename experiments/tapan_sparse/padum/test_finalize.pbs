@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -N er_test_final
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=16gb:centos=amdepyc
+#PBS -l walltime=02:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 MKL_NUM_THREADS=4
+if ! test -f artifacts/test_prototype_v1/submission/report.json; then
+  .conda-er/bin/python -u business_entity_resolution/src/test_pipeline.py assemble \
+    --cache artifacts/test_prototype_v1/cache --scored artifacts/test_prototype_v1/scored \
+    --output artifacts/test_prototype_v1/submission
+fi
+.conda-er/bin/python -u business_entity_resolution/src/validate_final_submission.py \
+  --validator 6ab10eb3b23ba_student_resource/student_resource/utils/validate_submission.py \
+  --test-dir 6ab10eb3b23ba_student_resource/student_resource/dataset/test \
+  --output artifacts/test_prototype_v1/submission

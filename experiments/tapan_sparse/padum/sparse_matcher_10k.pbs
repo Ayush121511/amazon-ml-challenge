@@ -1,0 +1,21 @@
+#!/bin/bash
+#PBS -N er_match_sparse
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=16gb:centos=amdepyc
+#PBS -l walltime=04:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 MKL_NUM_THREADS=4
+.conda-er/bin/python -u business_entity_resolution/src/audit_candidate_ceiling.py \
+ --run artifacts/sparse_compact_100k \
+ --gold 6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv \
+ --output artifacts/sparse_compact_100k/oracle_f05.json
+.conda-er/bin/python -u business_entity_resolution/src/prepare_saved_pairs.py \
+ --run artifacts/sparse_compact_10k --targets artifacts/preprocessed_v2/train \
+ --ground-truth 6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv \
+ --output artifacts/pairs_sparse_10k
+.conda-er/bin/python -u business_entity_resolution/src/train_sparse_matcher.py \
+ --data artifacts/pairs_sparse_10k --output artifacts/matcher_sparse_10k
