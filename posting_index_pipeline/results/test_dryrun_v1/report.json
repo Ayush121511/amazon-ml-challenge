@@ -1,0 +1,79 @@
+{
+  "split": "test",
+  "references": 100000,
+  "decision": {
+    "rule": "expected",
+    "threshold": 0.65
+  },
+  "stats": {
+    "pairs": 19997320,
+    "exclusivity_zeroed_pairs": 18451,
+    "exclusivity_zeroed_pairs_above_threshold": 637,
+    "matches": 300955
+  },
+  "references_with_no_match": 7454,
+  "match_count_distribution": {
+    "0": 7454,
+    "1": 10496,
+    "2": 20704,
+    "3": 24412,
+    "4": 18945,
+    "5": 10946,
+    "6": 4746,
+    "7": 1716,
+    "8": 458,
+    "9": 92,
+    "10": 21,
+    "11": 5,
+    "12": 5
+  },
+  "per_country": {
+    "France": {
+      "references": 15154,
+      "no_match_rate": 0.12247591395011218,
+      "mean_matches": 2.78289560512076,
+      "mean_candidates": 199.82314900356343
+    },
+    "India": {
+      "references": 46680,
+      "no_match_rate": 0.07410025706940875,
+      "mean_matches": 2.927592116538132,
+      "mean_candidates": 200.0
+    },
+    "US": {
+      "references": 38166,
+      "no_match_rate": 0.05604464706807106,
+      "mean_matches": 3.1997851490855735,
+      "mean_candidates": 200.0
+    }
+  },
+  "train_reference_rates": "no-match 5.6%, mean 3.46 matches per reference",
+  "timing": {
+    "load_France": 65.45944063086063,
+    "block": 193.67352203000337,
+    "features": 262.76917475275695,
+    "consume": 213.91111326776445,
+    "load_India": 98.23676618374884,
+    "load_US": 75.29962162580341
+  },
+  "seconds": 928.8921952070668,
+  "parameters": {
+    "stage": "predict",
+    "data": "artifacts/preprocessed_v2/test",
+    "index": "artifacts/posting_index_v1/test_index_t",
+    "output": "artifacts/dryrun_v1_t",
+    "top_k": "200",
+    "top_terms": "64",
+    "keep": "200",
+    "batch": "4096",
+    "threads": "8",
+    "split": "test",
+    "model": "artifacts/matcher_v1/model_k200",
+    "limit": "0",
+    "sample": "100000",
+    "sample_seed": "predict-sample-v1",
+    "exclusive": "True",
+    "ref_index": "None",
+    "reverse": "None"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "references": 8999,
+  "keep": 200,
+  "decision": {
+    "rule": "expected",
+    "threshold": 0.65
+  },
+  "macro_f05": 0.9292121433114765,
+  "oracle_matcher_macro_f05": 0.9748496034222749,
+  "loss_by_kind": {
+    "blocking_only": 0.021500216064216017,
+    "missed_candidate_only": 0.02036077740945541,
+    "mixed": 0.01567895060005297,
+    "false_positive_only": 0.007247245874037155,
+    "singleton_false_match": 0.006000666740748978,
+    "perfect": 0.0
+  },
+  "false_positive_links": 564,
+  "blocking_missed_links": 1949,
+  "matcher_missed_links": 2399,
+  "gold_links": 31168,
+  "loss_by_gold_count": {
+    "0": 0.006000666740748978,
+    "1": 0.008229784316016129,
+    "2": 0.014719208018463367,
+    "3": 0.016286936911984667,
+    "4": 0.012188523592568468,
+    "5": 0.007761299144162322,
+    "6": 0.0037152531198137236,
+    "7": 0.0014113220421758275,
+    "8": 0.00047486280257704914
+  }
+}

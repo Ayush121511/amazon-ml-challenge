@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -N er_v3_train
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=48gb:centos=amdepyc
+#PBS -l walltime=08:00:00
+#PBS -j oe
+# CPU-only; the GPU is requested only because scai_q requires one per job.
+# v3 = v2 + phonetic name route. Rebuilds train/test target indexes with the 4th route (same
+# ordinals, so the v2 reverse-search outputs stay valid), then pairs + matcher on the SAME
+# 100k references as v2 (seed matcher-v2) for a like-for-like comparison.
+# Usage: qsub padum/v3_train_chain.pbs   (NCPUS decides threads)
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"; W=$(( N > 1 ? N - 1 : 1 ))
+SRC=business_entity_resolution/src
+PIDX=artifacts/posting_index_v1
+PREV=$PIDX/previous_samples
+GOLD=6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv
+(cd business_entity_resolution && "$PY" -m unittest discover -s tests)
+for SPLIT in train test; do
+  test -e $PIDX/${SPLIT}_index_p || "$PY" -u $SRC/posting_index.py --data artifacts/preprocessed_v2/$SPLIT \
+    --split $SPLIT --output $PIDX/${SPLIT}_index_p --workers "$W" --chunk-rows 50000 \
+    --max-df-fraction 0.005 --min-max-df 1000
+done
+OUT=artifacts/matcher_v3
+/usr/bin/time -v "$PY" -u $SRC/submission_pipeline.py pairs \
+  --data artifacts/preprocessed_v2/train --index $PIDX/train_index_p \
+  --ref-index $PIDX/train_ref_index --reverse $PIDX/train_reverse_t \
+  --output $OUT/pairs --gold $GOLD --per-country 50000 --seed matcher-v2 \
+  --top-k 200 --top-terms 64 --keep 200 --threads "$N" \
+  --exclude-ids $PREV/retrieval_v1_ids.txt --exclude-ids $PREV/sparse_fullpool_ids.txt \
+  --exclude-ids $PREV/selective_index_v1_ids.txt --exclude-ids $PIDX/train_query_10000/reference_ids.txt
+"$PY" -u $SRC/submission_pipeline.py train --pairs $OUT/pairs --output $OUT/model_k200 \
+  --max-rank 200 --rounds 2500 --threads "$N"
+"$PY" -u $SRC/analyze_matcher_loss.py --pairs $OUT/pairs --model $OUT/model_k200 --output $OUT/model_k200/loss_analysis

@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "n_features": 4194304,
+  "routes": [
+    "name",
+    "address",
+    "anchor"
+  ],
+  "inputs": [
+    {
+      "path": "/home/scai/mtech/aib262467/scratch/amazon_ml_2026/artifacts/preprocessed_v2/train/train_source2.tsv.gz",
+      "bytes": 496576621
+    },
+    {
+      "path": "/home/scai/mtech/aib262467/scratch/amazon_ml_2026/artifacts/preprocessed_v2/train/train_source3.tsv.gz",
+      "bytes": 487845279
+    }
+  ],
+  "max_df_fraction": 0.005,
+  "min_max_df": 1000,
+  "countries": {
+    "India": {
+      "dir": "India_967ce367",
+      "targets": 4133346,
+      "routes": {
+        "name": {
+          "max_df": 20666,
+          "terms_seen": 1030995,
+          "terms_indexed": 1029119,
+          "terms_dropped_common": 1876,
+          "nnz": 85532260
+        },
+        "address": {
+          "max_df": 20666,
+          "terms_seen": 725730,
+          "terms_indexed": 722198,
+          "terms_dropped_common": 3532,
+          "nnz": 129708474
+        },
+        "anchor": {
+          "max_df": 20666,
+          "terms_seen": 1123385,
+          "terms_indexed": 1123380,
+          "terms_dropped_common": 5,
+          "nnz": 8817292
+        }
+      }
+    },
+    "US": {
+      "dir": "US_aa309355",
+      "targets": 6186873,
+      "routes": {
+        "name": {
+          "max_df": 30934,
+          "terms_seen": 1439514,
+          "terms_indexed": 1437618,
+          "terms_dropped_common": 1896,
+          "nnz": 138843086
+        },
+        "address": {
+          "max_df": 30934,
+          "terms_seen": 588822,
+          "terms_indexed": 586626,
+          "terms_dropped_common": 2196,
+          "nnz": 164022004
+        },
+        "anchor": {
+          "max_df": 30934,
+          "terms_seen": 2208959,
+          "terms_indexed": 2208959,
+          "terms_dropped_common": 0,
+          "nnz": 8105310
+        }
+      }
+    }
+  },
+  "build_seconds": {
+    "pass1_df": 165.4770629471168,
+    "pass2_weights": 111.88961239717901,
+    "finalize": 60.77548039983958,
+    "total": 338.14215632434934
+  },
+  "index_bytes": 5436507158,
+  "peak_rss_kib_linux": {
+    "self": 4131204,
+    "largest_worker": 804580
+  }
+}

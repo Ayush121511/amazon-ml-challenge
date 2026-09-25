@@ -1,0 +1,318 @@
+{
+  "split": "train",
+  "sample": {
+    "reference_ids_file": "artifacts/posting_index_v1/previous_samples/sparse_fullpool_ids.txt",
+    "reference_ids_sha256": "d86c0aba0485af7338719a33de528a97e74af16238b9675473849f049843b237",
+    "references_by_country": {
+      "US": 200,
+      "India": 200
+    }
+  },
+  "parameters": {
+    "data": "artifacts/preprocessed_v2/train",
+    "split": "train",
+    "index": "artifacts/posting_index_v1/train_index",
+    "output": "artifacts/posting_index_v1/train_query_sparse_fullpool",
+    "gold": "6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv",
+    "per_country": 10000,
+    "reference_ids": "artifacts/posting_index_v1/previous_samples/sparse_fullpool_ids.txt",
+    "first": 0,
+    "top_k": 100,
+    "top_terms": 32,
+    "batch": 4096,
+    "threads": 8,
+    "test_references": 1732544
+  },
+  "index": {
+    "build_seconds": {
+      "pass1_df": 165.4770629471168,
+      "pass2_weights": 111.88961239717901,
+      "finalize": 60.77548039983958,
+      "total": 338.14215632434934
+    },
+    "index_bytes": 5436507158,
+    "max_df_fraction": 0.005,
+    "min_max_df": 1000
+  },
+  "environment": {
+    "host": "scai03",
+    "python": "3.11.16",
+    "pbs_job": "1065364.pbshpc",
+    "cpus": 32
+  },
+  "throughput": {
+    "references": 400,
+    "regenerate_previous_samples_seconds": 0.0,
+    "reference_loading_seconds": 12.436655681580305,
+    "index_load_seconds": 10.620947390794754,
+    "query_seconds": 1.4969620276242495,
+    "end_to_end_seconds": 24.60814645513892,
+    "references_per_second_query": 267.2078467045815,
+    "timing": {
+      "load_index_India": 4.6063700299710035,
+      "query_India": 0.5672107422724366,
+      "references_India": 200,
+      "load_index_US": 6.0145773608237505,
+      "query_US": 0.9297512853518128,
+      "references_US": 200
+    },
+    "peak_rss_kib": 3841292,
+    "extrapolated_test_seconds": 6506.939051042945,
+    "extrapolation_note": "Index load + one pass over Source 1 as measured here, plus test references / measured query rate. The test pool (9.97M targets, three countries) needs its own index build; check its measured rate before relying on this estimate."
+  },
+  "recall": {
+    "all": {
+      "references": 400,
+      "positive_references": 384,
+      "singletons": 16,
+      "gold_links": 1379,
+      "recall_at_10": 0.8520667150108775,
+      "macro_recall_at_10": 0.8636026372354499,
+      "recall_at_20": 0.8868745467730239,
+      "macro_recall_at_20": 0.8955966848544974,
+      "recall_at_50": 0.9158810732414794,
+      "macro_recall_at_50": 0.9219049685846561,
+      "name_recall_at_route_k": 0.5736040609137056,
+      "address_recall_at_route_k": 0.8375634517766497,
+      "anchor_recall_at_route_k": 0.6707759245830311,
+      "union_recall": 0.9427121102248006,
+      "mean_union_candidates": 232.2775,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": {
+            "p10": 0.3639897108078003,
+            "median": 0.6816676259040833,
+            "p90": 0.8545109033584595,
+            "mean": 0.6450571830364618
+          },
+          "address": {
+            "p10": 0.3562970459461212,
+            "median": 0.5527094006538391,
+            "p90": 0.7464089393615723,
+            "mean": 0.5462247715331614
+          },
+          "anchor": {
+            "p10": 0.7165675759315491,
+            "median": 1.0,
+            "p90": 1.0,
+            "mean": 0.9385847745670213
+          }
+        },
+        "singleton": {
+          "name": {
+            "p10": 0.4256603419780731,
+            "median": 0.6799927353858948,
+            "p90": 0.8559970259666443,
+            "mean": 0.6430455376394093
+          },
+          "address": {
+            "p10": 0.2771005928516388,
+            "median": 0.5592082738876343,
+            "p90": 0.6828821301460266,
+            "mean": 0.5065961237996817
+          },
+          "anchor": {
+            "p10": 0.6089901924133301,
+            "median": 0.833526074886322,
+            "p90": 1.0,
+            "mean": 0.8378723997336167
+          }
+        }
+      }
+    },
+    "India": {
+      "references": 200,
+      "positive_references": 192,
+      "singletons": 8,
+      "gold_links": 698,
+      "recall_at_10": 0.8108882521489972,
+      "macro_recall_at_10": 0.8248677248677251,
+      "recall_at_20": 0.839541547277937,
+      "macro_recall_at_20": 0.8533523478835977,
+      "recall_at_50": 0.8753581661891118,
+      "macro_recall_at_50": 0.8880373677248676,
+      "name_recall_at_route_k": 0.5143266475644699,
+      "address_recall_at_route_k": 0.7893982808022922,
+      "anchor_recall_at_route_k": 0.6404011461318052,
+      "union_recall": 0.9140401146131805,
+      "mean_union_candidates": 248.365,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": {
+            "p10": 0.3169371485710144,
+            "median": 0.6582397818565369,
+            "p90": 0.8360080122947693,
+            "mean": 0.6159489670315305
+          },
+          "address": {
+            "p10": 0.30423519015312195,
+            "median": 0.4506743252277374,
+            "p90": 0.5915586948394775,
+            "mean": 0.4563178999039034
+          },
+          "anchor": {
+            "p10": 0.7803236842155457,
+            "median": 1.0,
+            "p90": 1.0000001192092896,
+            "mean": 0.945482703517465
+          }
+        },
+        "singleton": {
+          "name": {
+            "p10": 0.48470520973205566,
+            "median": 0.717993438243866,
+            "p90": 0.8559970259666443,
+            "mean": 0.6964671164751053
+          },
+          "address": {
+            "p10": 0.2209082841873169,
+            "median": 0.3849722146987915,
+            "p90": 0.653904378414154,
+            "mean": 0.4055844321846962
+          },
+          "anchor": {
+            "p10": 0.5917426347732544,
+            "median": 0.7421513795852661,
+            "p90": 1.0,
+            "mean": 0.7496795952320099
+          }
+        }
+      }
+    },
+    "US": {
+      "references": 200,
+      "positive_references": 192,
+      "singletons": 8,
+      "gold_links": 681,
+      "recall_at_10": 0.8942731277533039,
+      "macro_recall_at_10": 0.9023375496031746,
+      "recall_at_20": 0.9353891336270191,
+      "macro_recall_at_20": 0.9378410218253967,
+      "recall_at_50": 0.9574155653450808,
+      "macro_recall_at_50": 0.9557725694444444,
+      "name_recall_at_route_k": 0.6343612334801763,
+      "address_recall_at_route_k": 0.8869309838472834,
+      "anchor_recall_at_route_k": 0.7019089574155654,
+      "union_recall": 0.9720998531571219,
+      "mean_union_candidates": 216.19,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": {
+            "p10": 0.43917927145957947,
+            "median": 0.6921804547309875,
+            "p90": 0.8685815334320068,
+            "mean": 0.6732510048213429
+          },
+          "address": {
+            "p10": 0.486345499753952,
+            "median": 0.6464511752128601,
+            "p90": 0.7730369567871094,
+            "mean": 0.6361316431624194
+          },
+          "anchor": {
+            "p10": 0.7071067690849304,
+            "median": 1.0,
+            "p90": 1.0,
+            "mean": 0.9324129434008347
+          }
+        },
+        "singleton": {
+          "name": {
+            "p10": 0.10764453560113907,
+            "median": 0.671971321105957,
+            "p90": 0.8996444344520569,
+            "mean": 0.5896239588037133
+          },
+          "address": {
+            "p10": 0.4217715561389923,
+            "median": 0.6211795806884766,
+            "p90": 0.7087759375572205,
+            "mean": 0.6076078154146671
+          },
+          "anchor": {
+            "p10": 0.6089901924133301,
+            "median": 1.0,
+            "p90": 1.0,
+            "mean": 0.9134662321635655
+          }
+        }
+      }
+    },
+    "non_ascii_name": {
+      "references": 0,
+      "positive_references": 0,
+      "singletons": 0,
+      "gold_links": 0,
+      "recall_at_10": null,
+      "macro_recall_at_10": null,
+      "recall_at_20": null,
+      "macro_recall_at_20": null,
+      "recall_at_50": null,
+      "macro_recall_at_50": null,
+      "name_recall_at_route_k": null,
+      "address_recall_at_route_k": null,
+      "anchor_recall_at_route_k": null,
+      "union_recall": null,
+      "mean_union_candidates": null,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": null,
+          "address": null,
+          "anchor": null
+        },
+        "singleton": {
+          "name": null,
+          "address": null,
+          "anchor": null
+        }
+      }
+    }
+  },
+  "miss_audit": {
+    "misses": 116,
+    "by_country_stage": {
+      "India:absent_from_routes": 60,
+      "India:lost_at_50": 27,
+      "US:absent_from_routes": 19,
+      "US:lost_at_50": 10
+    },
+    "primary_reason": {
+      "similar_name_crowded_out": 52,
+      "name_script_mismatch": 29,
+      "target_address_missing": 19,
+      "address_anchor_only": 6,
+      "low_text_similarity": 6,
+      "web_domain_name": 4
+    },
+    "primary_reason_by_country": {
+      "India": {
+        "similar_name_crowded_out": 40,
+        "name_script_mismatch": 29,
+        "target_address_missing": 8,
+        "address_anchor_only": 6,
+        "low_text_similarity": 2,
+        "web_domain_name": 2
+      },
+      "US": {
+        "similar_name_crowded_out": 12,
+        "target_address_missing": 11,
+        "low_text_similarity": 4,
+        "web_domain_name": 2
+      }
+    },
+    "overlapping_flags": {
+      "name_token_jaccard_ge_0_5": 71,
+      "name_script_mismatch": 29,
+      "shares_address_number": 56,
+      "target_address_missing": 19,
+      "web_domain_name": 4,
+      "non_ascii_same_script": 2
+    },
+    "target_in_other_country_pool": 0,
+    "note": "Flags overlap; primary_reason is a priority assignment so it sums to the total. name_script_mismatch means the two names share no alphabetic script; non_ascii_same_script means non-ASCII characters appear but the scripts overlap."
+  }
+}

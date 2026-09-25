@@ -1,0 +1,319 @@
+{
+  "split": "train",
+  "sample": {
+    "reference_ids_file": "artifacts/posting_index_v1/previous_samples/retrieval_v1_ids.txt",
+    "reference_ids_sha256": "b6170608261108aef149cab8e1d1a0d5b722defd2c0db6cf0de3d5490e0b1175",
+    "references_by_country": {
+      "India": 1000,
+      "US": 1000
+    }
+  },
+  "parameters": {
+    "data": "artifacts/preprocessed_v2/train",
+    "split": "train",
+    "index": "artifacts/posting_index_v1/train_index",
+    "output": "artifacts/posting_index_v1/sweep_retrieval_v1/terms64_k200",
+    "gold": "6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv",
+    "per_country": 10000,
+    "reference_ids": "artifacts/posting_index_v1/previous_samples/retrieval_v1_ids.txt",
+    "first": 0,
+    "top_k": 200,
+    "top_terms": 64,
+    "batch": 4096,
+    "threads": 8,
+    "test_references": 1732544
+  },
+  "index": {
+    "build_seconds": {
+      "pass1_df": 165.4770629471168,
+      "pass2_weights": 111.88961239717901,
+      "finalize": 60.77548039983958,
+      "total": 338.14215632434934
+    },
+    "index_bytes": 5436507158,
+    "max_df_fraction": 0.005,
+    "min_max_df": 1000
+  },
+  "environment": {
+    "host": "scai02",
+    "python": "3.11.16",
+    "pbs_job": "1065375.pbshpc",
+    "cpus": 32
+  },
+  "throughput": {
+    "references": 2000,
+    "regenerate_previous_samples_seconds": 0.0,
+    "reference_loading_seconds": 12.509857137687504,
+    "index_load_seconds": 0.9109957218170166,
+    "query_seconds": 7.342065275646746,
+    "end_to_end_seconds": 20.8057164484635,
+    "references_per_second_query": 272.4029172873057,
+    "timing": {
+      "load_index_India": 0.41578969545662403,
+      "query_India": 2.9986545871943235,
+      "references_India": 1000,
+      "load_index_US": 0.49520602636039257,
+      "query_US": 4.343410688452423,
+      "references_US": 1000
+    },
+    "peak_rss_kib": 3946792,
+    "extrapolated_test_seconds": 6373.646423324563,
+    "extrapolation_note": "Index load + one pass over Source 1 as measured here, plus test references / measured query rate. The test pool (9.97M targets, three countries) needs its own index build; check its measured rate before relying on this estimate."
+  },
+  "recall": {
+    "all": {
+      "references": 2000,
+      "positive_references": 1911,
+      "singletons": 89,
+      "gold_links": 6905,
+      "recall_at_10": 0.8540188269370022,
+      "macro_recall_at_10": 0.8559924580332734,
+      "recall_at_20": 0.8922519913106445,
+      "macro_recall_at_20": 0.8925747344114685,
+      "recall_at_50": 0.9152787834902245,
+      "macro_recall_at_50": 0.9133487827365373,
+      "name_recall_at_route_k": 0.5791455467052861,
+      "address_recall_at_route_k": 0.8538740043446778,
+      "anchor_recall_at_route_k": 0.6812454742939898,
+      "union_recall": 0.9522085445329471,
+      "mean_union_candidates": 464.758,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": {
+            "p10": 0.35153189301490784,
+            "median": 0.662776529788971,
+            "p90": 0.8648801445960999,
+            "mean": 0.6347796790798506
+          },
+          "address": {
+            "p10": 0.3798803985118866,
+            "median": 0.6074645519256592,
+            "p90": 0.7789487242698669,
+            "mean": 0.5928350811496189
+          },
+          "anchor": {
+            "p10": 0.712439775466919,
+            "median": 1.0,
+            "p90": 1.0,
+            "mean": 0.9359662572621223
+          }
+        },
+        "singleton": {
+          "name": {
+            "p10": 0.3486644923686981,
+            "median": 0.6652415990829468,
+            "p90": 0.8295196890830994,
+            "mean": 0.631797541660824
+          },
+          "address": {
+            "p10": 0.36582109332084656,
+            "median": 0.541983962059021,
+            "p90": 0.6872879266738892,
+            "mean": 0.5318315501293439
+          },
+          "anchor": {
+            "p10": 0.5161051750183105,
+            "median": 0.801002562046051,
+            "p90": 1.0,
+            "mean": 0.7986165990292187
+          }
+        }
+      }
+    },
+    "India": {
+      "references": 1000,
+      "positive_references": 954,
+      "singletons": 46,
+      "gold_links": 3443,
+      "recall_at_10": 0.8152773743828057,
+      "macro_recall_at_10": 0.816401284483045,
+      "recall_at_20": 0.8544873656694743,
+      "macro_recall_at_20": 0.854150860204319,
+      "recall_at_50": 0.8780133604414755,
+      "macro_recall_at_50": 0.8757512229210339,
+      "name_recall_at_route_k": 0.5117629973860006,
+      "address_recall_at_route_k": 0.807435376125472,
+      "anchor_recall_at_route_k": 0.6474005227998838,
+      "union_recall": 0.9259366831251815,
+      "mean_union_candidates": 496.435,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": {
+            "p10": 0.3057056963443756,
+            "median": 0.6236331462860107,
+            "p90": 0.8477176427841187,
+            "mean": 0.5988758272568258
+          },
+          "address": {
+            "p10": 0.3208191692829132,
+            "median": 0.5386894345283508,
+            "p90": 0.709004282951355,
+            "mean": 0.5242640989647491
+          },
+          "anchor": {
+            "p10": 0.7612084150314331,
+            "median": 1.0,
+            "p90": 1.0000001192092896,
+            "mean": 0.9406273548557263
+          }
+        },
+        "singleton": {
+          "name": {
+            "p10": 0.2554045617580414,
+            "median": 0.6237557530403137,
+            "p90": 0.8092076778411865,
+            "mean": 0.5795406113294038
+          },
+          "address": {
+            "p10": 0.2986443340778351,
+            "median": 0.5098779201507568,
+            "p90": 0.6781665086746216,
+            "mean": 0.49841000204500946
+          },
+          "anchor": {
+            "p10": 0.47839751839637756,
+            "median": 0.801002562046051,
+            "p90": 1.0,
+            "mean": 0.7792765296794273
+          }
+        }
+      }
+    },
+    "US": {
+      "references": 1000,
+      "positive_references": 957,
+      "singletons": 43,
+      "gold_links": 3462,
+      "recall_at_10": 0.8925476603119584,
+      "macro_recall_at_10": 0.89545952132159,
+      "recall_at_20": 0.9298093587521664,
+      "macro_recall_at_20": 0.9308781576022952,
+      "recall_at_50": 0.9523396880415944,
+      "macro_recall_at_50": 0.9508284818629641,
+      "name_recall_at_route_k": 0.646158290005777,
+      "address_recall_at_route_k": 0.9000577700751011,
+      "anchor_recall_at_route_k": 0.7149046793760832,
+      "union_recall": 0.9783362218370883,
+      "mean_union_candidates": 433.081,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": {
+            "p10": 0.40986356139183044,
+            "median": 0.7079632878303528,
+            "p90": 0.8764804601669312,
+            "mean": 0.6703405004714451
+          },
+          "address": {
+            "p10": 0.494125634431839,
+            "median": 0.6780136227607727,
+            "p90": 0.8168420791625977,
+            "mean": 0.6609761512204771
+          },
+          "anchor": {
+            "p10": 0.6868836283683777,
+            "median": 1.0,
+            "p90": 1.0,
+            "mean": 0.9318401209226197
+          }
+        },
+        "singleton": {
+          "name": {
+            "p10": 0.49599745869636536,
+            "median": 0.7191418409347534,
+            "p90": 0.8353453874588013,
+            "mean": 0.6852697494418122
+          },
+          "address": {
+            "p10": 0.4439432621002197,
+            "median": 0.5716806650161743,
+            "p90": 0.7214674353599548,
+            "mean": 0.567584834126539
+          },
+          "anchor": {
+            "p10": 0.6044787764549255,
+            "median": 0.81502366065979,
+            "p90": 1.0,
+            "mean": 0.8196631450863445
+          }
+        }
+      }
+    },
+    "non_ascii_name": {
+      "references": 0,
+      "positive_references": 0,
+      "singletons": 0,
+      "gold_links": 0,
+      "recall_at_10": null,
+      "macro_recall_at_10": null,
+      "recall_at_20": null,
+      "macro_recall_at_20": null,
+      "recall_at_50": null,
+      "macro_recall_at_50": null,
+      "name_recall_at_route_k": null,
+      "address_recall_at_route_k": null,
+      "anchor_recall_at_route_k": null,
+      "union_recall": null,
+      "mean_union_candidates": null,
+      "empty_shortlists": 0,
+      "top1_score_by_route": {
+        "positive": {
+          "name": null,
+          "address": null,
+          "anchor": null
+        },
+        "singleton": {
+          "name": null,
+          "address": null,
+          "anchor": null
+        }
+      }
+    }
+  },
+  "miss_audit": {
+    "misses": 585,
+    "by_country_stage": {
+      "India:absent_from_routes": 255,
+      "India:lost_at_50": 165,
+      "US:absent_from_routes": 75,
+      "US:lost_at_50": 90
+    },
+    "primary_reason": {
+      "name_script_mismatch": 138,
+      "similar_name_crowded_out": 231,
+      "target_address_missing": 140,
+      "address_anchor_only": 33,
+      "web_domain_name": 30,
+      "low_text_similarity": 13
+    },
+    "primary_reason_by_country": {
+      "India": {
+        "name_script_mismatch": 138,
+        "similar_name_crowded_out": 166,
+        "target_address_missing": 64,
+        "address_anchor_only": 26,
+        "web_domain_name": 22,
+        "low_text_similarity": 4
+      },
+      "US": {
+        "web_domain_name": 8,
+        "similar_name_crowded_out": 65,
+        "target_address_missing": 76,
+        "low_text_similarity": 9,
+        "address_anchor_only": 7
+      }
+    },
+    "overlapping_flags": {
+      "name_script_mismatch": 138,
+      "shares_address_number": 329,
+      "name_token_jaccard_ge_0_5": 362,
+      "target_address_missing": 140,
+      "non_ascii_same_script": 49,
+      "web_domain_name": 30
+    },
+    "target_in_other_country_pool": 0,
+    "note": "Flags overlap; primary_reason is a priority assignment so it sums to the total. name_script_mismatch means the two names share no alphabetic script; non_ascii_same_script means non-ASCII characters appear but the scripts overlap."
+  }
+}

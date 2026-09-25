@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N er_exp
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=48gb:centos=amdepyc
+#PBS -l walltime=03:00:00
+#PBS -j oe
+# CPU-only; the GPU is requested only because scai_q requires one per job.
+# Fast matcher experiments on saved pairs: fewer training references, same dev/holdout as the
+# full model, so holdout F0.5 is directly comparable. Usage: qsub -v PAIRS=...,REFS=25000 padum/train_experiments.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"
+PAIRS="${PAIRS:-artifacts/matcher_v2/pairs}"
+REFS="${REFS:-25000}"
+OUT="$(dirname "$PAIRS")/exp_${REFS}"
+(cd business_entity_resolution && "$PY" -m unittest discover -s tests)
+T=business_entity_resolution/src/submission_pipeline.py
+# A: v2 settings (learning-curve point).  B: larger/longer LightGBM.
+"$PY" -u $T train --pairs "$PAIRS" --output "${OUT}_a" --max-rank 100 --train-refs "$REFS" \
+  --rounds 2000 --threads "$N"
+"$PY" -u $T train --pairs "$PAIRS" --output "${OUT}_b" --max-rank 100 --train-refs "$REFS" \
+  --rounds 4000 --num-leaves 127 --learning-rate 0.08 --min-data-in-leaf 50 --early-stopping 100 --threads "$N"
+for V in a b; do
+  "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); print(sys.argv[1], r['decision'], 'dev', round(r['macro_f05_dev'],4), 'holdout', round(r['macro_f05_holdout'],4), {c: round(v['macro_f05'],4) for c, v in r['holdout_by_country'].items()}, 'iter', r['best_iteration'])" "${OUT}_$V/report.json"
+done

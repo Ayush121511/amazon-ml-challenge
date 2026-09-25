@@ -1,0 +1,46 @@
+#!/bin/bash
+#PBS -N er_v2_train
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb:centos=amdepyc
+#PBS -l walltime=12:00:00
+#PBS -j oe
+# CPU-only; the GPU is requested only because scai_q requires one per job.
+# v1 loss analysis, then v2 blocking on train (transliterated target index + reverse search),
+# then matcher v2 (forward + reverse candidates, 50k references per country).
+# Usage: qsub padum/v2_train_chain.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"; W=$(( N > 1 ? N - 1 : 1 ))
+SRC=business_entity_resolution/src
+PIDX=artifacts/posting_index_v1
+PREV=$PIDX/previous_samples
+GOLD=6ab10eb3b23ba_student_resource/student_resource/dataset/train/train_ground_truth.tsv
+(cd business_entity_resolution && "$PY" -m unittest discover -s tests)
+test -e artifacts/matcher_v1/model_k200/loss_analysis || "$PY" -u $SRC/analyze_matcher_loss.py \
+  --pairs artifacts/matcher_v1/pairs --model artifacts/matcher_v1/model_k200 \
+  --output artifacts/matcher_v1/model_k200/loss_analysis
+test -e $PIDX/train_index_t || "$PY" -u $SRC/posting_index.py --data artifacts/preprocessed_v2/train \
+  --split train --output $PIDX/train_index_t --workers "$W" --chunk-rows 50000 --max-df-fraction 0.005 --min-max-df 1000
+test -e $PIDX/train_ref_index || "$PY" -u $SRC/posting_index.py --data artifacts/preprocessed_v2/train \
+  --split train --sources 1 --output $PIDX/train_ref_index --workers "$W" --chunk-rows 50000 \
+  --max-df-fraction 0.005 --min-max-df 1000
+test -e $PIDX/train_reverse_t || /usr/bin/time -v "$PY" -u $SRC/reverse_index.py \
+  --ref-index $PIDX/train_ref_index --target-index $PIDX/train_index_t \
+  --output $PIDX/train_reverse_t --top-k 50 --top-terms 64 --keep 10 --threads "$N"
+OUT=artifacts/matcher_v2
+/usr/bin/time -v "$PY" -u $SRC/submission_pipeline.py pairs \
+  --data artifacts/preprocessed_v2/train --index $PIDX/train_index_t \
+  --ref-index $PIDX/train_ref_index --reverse $PIDX/train_reverse_t \
+  --output $OUT/pairs --gold $GOLD --per-country 50000 --seed matcher-v2 \
+  --top-k 200 --top-terms 64 --keep 200 --threads "$N" \
+  --exclude-ids $PREV/retrieval_v1_ids.txt --exclude-ids $PREV/sparse_fullpool_ids.txt \
+  --exclude-ids $PREV/selective_index_v1_ids.txt --exclude-ids $PIDX/train_query_10000/reference_ids.txt
+for K in 100 200; do
+  "$PY" -u $SRC/submission_pipeline.py train --pairs $OUT/pairs --output $OUT/model_k$K \
+    --max-rank $K --rounds 2000 --threads "$N"
+done
+"$PY" -u $SRC/analyze_matcher_loss.py --pairs $OUT/pairs --model $OUT/model_k200 --output $OUT/model_k200/loss_analysis

@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -N er_v2_test
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=48gb:centos=amdepyc
+#PBS -l walltime=06:00:00
+#PBS -j oe
+# CPU-only; the GPU is requested only because scai_q requires one per job.
+# v2 blocking on test: transliterated target index, Source 1 reference index, reverse search.
+# Usage: qsub padum/v2_test_chain.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"; W=$(( N > 1 ? N - 1 : 1 ))
+SRC=business_entity_resolution/src
+PIDX=artifacts/posting_index_v1
+test -e $PIDX/test_index_t || "$PY" -u $SRC/posting_index.py --data artifacts/preprocessed_v2/test \
+  --split test --output $PIDX/test_index_t --workers "$W" --chunk-rows 50000 --max-df-fraction 0.005 --min-max-df 1000
+test -e $PIDX/test_ref_index || "$PY" -u $SRC/posting_index.py --data artifacts/preprocessed_v2/test \
+  --split test --sources 1 --output $PIDX/test_ref_index --workers "$W" --chunk-rows 50000 \
+  --max-df-fraction 0.005 --min-max-df 1000
+/usr/bin/time -v "$PY" -u $SRC/reverse_index.py --ref-index $PIDX/test_ref_index \
+  --target-index $PIDX/test_index_t --output $PIDX/test_reverse_t --top-k 50 --top-terms 64 --keep 10 --threads "$N"

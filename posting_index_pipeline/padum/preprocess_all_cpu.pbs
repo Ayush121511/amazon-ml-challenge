@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -N er_preprocess_all
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=6:ngpus=1:mem=12gb:centos=amdepyc
+#PBS -l walltime=02:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PYTHON="$PWD/.conda-er/bin/python"
+test -n "${PBS_JOBID:-}"
+"$PYTHON" -m unittest discover -s business_entity_resolution/tests -v
+mkdir -p artifacts/preprocessed_v2
+"$PYTHON" -u business_entity_resolution/src/preprocess.py \
+  --data 6ab10eb3b23ba_student_resource/student_resource/dataset \
+  --output artifacts/preprocessed_v2 --split all --workers 6 --resume
