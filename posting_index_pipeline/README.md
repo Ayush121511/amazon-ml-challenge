@@ -106,6 +106,27 @@ under `artifacts/`; they are not committed.
 Tests: `python -m unittest discover -s business_entity_resolution/tests` (43 tests; XGBoost + LightGBM included).
 Dependencies: `requirements.txt` in this folder.
 
+## Next matcher diagnostic (local Tapan experiment)
+
+`src/analyze_v4_errors.py` reads the existing v4 pair arrays and model and writes
+aggregate dev error counts, probability bins for missed true links and false links,
+and F0.5 before/after the target-exclusivity step used by test merge. It also
+reports the same counts separately for US and India. It does not train or
+change predictions. After copying the new script and PBS file into the Padum
+project, run on a compute node, starting with **dev**:
+
+```bash
+qsub padum/v4_error_diagnostic.pbs
+# When complete: cat artifacts/matcher_v4/model_xgb/diagnostics/dev_diagnostic.json
+```
+
+If most missed links have probabilities far below 0.75, adjusting the cutoff
+will not close the gap; train a better matcher on hard cases. If misses cluster
+near the cutoff, evaluate a new decision rule on dev before using holdout.
+The exclusivity simulation is within the sampled partition, so its effect may
+differ from full-test exclusivity. Neither train holdout nor similar France
+prediction counts prove France accuracy; France has no labeled validation.
+
 ## Results files (`results/`)
 
 | File | What it is |

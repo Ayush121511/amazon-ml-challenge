@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -N er_v4_errors
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=32gb:centos=amdepyc
+#PBS -l walltime=02:00:00
+#PBS -j oe
+# Read-only analysis of existing pairs/model; writes one small aggregate JSON.
+# Usage: qsub padum/v4_error_diagnostic.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+/usr/bin/time -v "$PWD/.conda-er/bin/python" -u \
+  business_entity_resolution/src/analyze_v4_errors.py \
+  --pairs artifacts/matcher_v4/pairs \
+  --model artifacts/matcher_v4/model_xgb \
+  --output artifacts/matcher_v4/model_xgb/diagnostics \
+  --partition dev --threads 4

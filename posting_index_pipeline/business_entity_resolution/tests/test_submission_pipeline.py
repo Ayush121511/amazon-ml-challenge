@@ -13,6 +13,7 @@ from posting_index import build, CountryIndex, load_manifest
 import gzip
 from submission_pipeline import (FEATURE_NAMES, TargetTable, candidates, decide, f05, features,
                                  macro_score, merge_reverse, stage_merge, stage_predict, stage_train)
+from analyze_v4_errors import exclusive_prob, score_and_errors
 from test_posting_index import FILLER, ref, write_source
 
 try:
@@ -165,6 +166,25 @@ class PipelineTests(unittest.TestCase):
         score = macro_score(['S1-a', 'S1-b'], np.array([0, 1]), np.array(['S2-1', 'S2-9'], dtype=object),
                             np.array([True, False]), gold)
         self.assertEqual(score, 1.0)
+
+    def test_v4_diagnostic_mirrors_target_exclusivity(self):
+        refs = ['S1-a', 'S1-b', 'S1-empty']
+        ref_idx = np.array([0, 1, 1])
+        targets = np.array(['S2-shared', 'S2-shared', 'S2-other'], dtype=object)
+        labels = np.array([1, 0, 0], dtype=bool)
+        prob = np.array([0.7, 0.8, 0.1], dtype=np.float32)
+        gold = {'S1-a': {'S2-shared'}, 'S1-b': set(), 'S1-empty': set()}
+        before = score_and_errors(refs, ref_idx, targets, labels, prob, gold,
+                                  'threshold', 0.5)
+        after_prob, removed = exclusive_prob(ref_idx, targets, prob)
+        after = score_and_errors(refs, ref_idx, targets, labels, after_prob, gold,
+                                 'threshold', 0.5)
+        self.assertEqual(removed, 1)
+        self.assertEqual(after_prob.tolist(), [0.0, float(prob[1]), float(prob[2])])
+        self.assertAlmostEqual(before['macro_f05'], 2 / 3)
+        self.assertAlmostEqual(after['macro_f05'], 1 / 3)
+        self.assertEqual(after['missed_true_links'], 1)
+        self.assertEqual(after['false_positive_links'], 1)
 
     @unittest.skipIf(lightgbm is None, 'lightgbm unavailable')
     def test_train_stage_end_to_end(self):
