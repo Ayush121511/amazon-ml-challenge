@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -N er_pack
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb:centos=amdepyc
+#PBS -l walltime=01:00:00
+#PBS -j oe
+# I/O-only packaging job (no GPU work possible; scai_q requires a GPU per job).
+# Usage: qsub padum/make_matcher_pack.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+PY="$PWD/.conda-er/bin/python"
+mkdir -p artifacts/share
+cd business_entity_resolution/src && "$PY" -u make_matcher_pack.py --pairs ../../artifacts/matcher_v4/pairs \
+  --prune ../../artifacts/prune_v1 --output ../../artifacts/share/matcher_dev_pack_v5.zip
+ls -l ../../artifacts/share

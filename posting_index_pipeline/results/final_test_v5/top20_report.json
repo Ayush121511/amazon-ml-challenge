@@ -1,0 +1,92 @@
+{
+  "split": "test",
+  "shards": [
+    "artifacts/full_v5_s1/top20",
+    "artifacts/full_v5_s0/top20"
+  ],
+  "parameters": {
+    "stage": "merge",
+    "data": "artifacts/preprocessed_v2/test",
+    "split": "test",
+    "model": "artifacts/prune_v1/model_top20",
+    "shards": "[PosixPath('artifacts/full_v5_s1/top20'), PosixPath('artifacts/full_v5_s0/top20')]",
+    "output": "artifacts/submission_v5_top20",
+    "exclusive": "True",
+    "country_threshold": ""
+  },
+  "references": 1732544,
+  "decision": {
+    "rule": "expected",
+    "threshold": 0.7
+  },
+  "stats": {
+    "pairs": 34650880,
+    "exclusivity_zeroed_pairs": 594662,
+    "exclusivity_zeroed_pairs_above_threshold": 3975,
+    "best_prob_quantiles": {
+      "France": {
+        "0.05": 0.6275264620780945,
+        "0.1": 0.9970541596412659,
+        "0.25": 0.9996854066848755,
+        "0.5": 0.9999151229858398
+      },
+      "India": {
+        "0.05": 0.440774142742157,
+        "0.1": 0.9957209229469299,
+        "0.25": 0.9995129108428955,
+        "0.5": 0.9998756647109985
+      },
+      "US": {
+        "0.05": 0.4706621766090393,
+        "0.1": 0.9971126317977905,
+        "0.25": 0.9996781349182129,
+        "0.5": 0.999923586845398
+      }
+    },
+    "country_thresholds": {
+      "France": 0.7,
+      "India": 0.7,
+      "US": 0.7
+    },
+    "matches": 5799447
+  },
+  "references_with_no_match": 94974,
+  "match_count_distribution": {
+    "0": 94974,
+    "1": 116493,
+    "2": 316433,
+    "3": 425759,
+    "4": 370254,
+    "5": 236415,
+    "6": 114242,
+    "7": 42894,
+    "8": 12148,
+    "9": 2542,
+    "10": 349,
+    "11": 35,
+    "12": 5,
+    "13": 1
+  },
+  "per_country": {
+    "France": {
+      "references": 259452,
+      "no_match_rate": 0.05175138368561429,
+      "mean_matches": 3.3467886160060436,
+      "mean_candidates": 20.0
+    },
+    "India": {
+      "references": 809986,
+      "no_match_rate": 0.05545898324168566,
+      "mean_matches": 3.3425688839066354,
+      "mean_candidates": 20.0
+    },
+    "US": {
+      "references": 663106,
+      "no_match_rate": 0.05523400481974224,
+      "mean_matches": 3.3534336893347367,
+      "mean_candidates": 20.0
+    }
+  },
+  "train_reference_rates": "no-match 5.6%, mean 3.46 matches per reference",
+  "seconds": 79.56998444534838
+}

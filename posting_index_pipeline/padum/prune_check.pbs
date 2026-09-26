@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N er_prune
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=96gb:centos=amdepyc
+#PBS -l walltime=04:00:00
+#PBS -j oe
+# Candidate pruning study on the v4 pairs: stage-1 retrieval-signal ranker (out-of-fold on
+# train), recall vs candidates per reference on dev, then the final XGBoost retrained on
+# stage-1 top-K candidates for each K in MASKS, with holdout macro F0.5 (vs v4 0.9731).
+# Usage: qsub padum/prune_check.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"
+SRC=business_entity_resolution/src
+PAIRS=artifacts/matcher_v4/pairs
+OUT=artifacts/prune_v1
+MASKS="${MASKS:-5,10,20}"
+(cd business_entity_resolution && "$PY" -m unittest discover -s tests 2>&1 | tail -3)
+test -f $OUT/report.json || "$PY" -u $SRC/prune_analysis.py --pairs $PAIRS --output $OUT --threads "$N" --masks "${MASKS//:/,}"
+for K in ${MASKS//[,:]/ }; do
+  test -e $OUT/model_top$K || "$PY" -u $SRC/submission_pipeline.py train --pairs $PAIRS --output $OUT/model_top$K \
+    --row-mask $OUT/mask_top$K.npy --max-rank 200 --backend xgboost --rounds 4000 --num-leaves 255 \
+    --learning-rate 0.05 --early-stopping 100 --threads "$N" > $OUT/train_top$K.log 2>&1
+  "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); print('RESULT top', sys.argv[2], 'dev', round(r['macro_f05_dev'],4), 'holdout', round(r['macro_f05_holdout'],4), {c: round(v['macro_f05'],4) for c, v in r['holdout_by_country'].items()}, r['decision'], 'iter', r['best_iteration'])" $OUT/model_top$K/report.json $K
+done

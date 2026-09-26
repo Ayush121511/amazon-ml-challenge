@@ -1,0 +1,486 @@
+{
+  "rows": 28758695,
+  "references": 100000,
+  "stage1_features": [
+    "score_name",
+    "inv_rank_name",
+    "gap_name",
+    "score_address",
+    "inv_rank_address",
+    "gap_address",
+    "score_anchor",
+    "inv_rank_anchor",
+    "gap_anchor",
+    "score_combined",
+    "inv_rank_combined",
+    "gap_combined",
+    "rrf",
+    "rrf_ratio",
+    "fused_rank",
+    "route_hits",
+    "in_forward",
+    "rev_rank",
+    "rev_rrf",
+    "rev_score_name",
+    "rev_score_address",
+    "rev_score_anchor",
+    "rev_inv_rank",
+    "rev_top1",
+    "emb_cos",
+    "emb_gap",
+    "emb_rank",
+    "dense_rank",
+    "dense_score",
+    "dense_rev_rank",
+    "dense_rev_score",
+    "dense_inv_rank",
+    "dense_rev_inv_rank",
+    "dense_rev_top1"
+  ],
+  "device": "cuda",
+  "results": {
+    "all_candidates": {
+      "dev": {
+        "recall": 0.9988676275838243,
+        "mean_candidates": 291.9739303482587,
+        "max_candidates": 65073,
+        "refs_with_zero": 0,
+        "recall_India": 0.9987119260494014,
+        "recall_US": 0.9990275022367449
+      },
+      "holdout": {
+        "recall": 0.998768709838778,
+        "mean_candidates": 288.8187653013961,
+        "max_candidates": 21228,
+        "refs_with_zero": 0,
+        "recall_India": 0.9986948176583493,
+        "recall_US": 0.9988429497068806
+      }
+    },
+    "emb_rank<=1": {
+      "dev": {
+        "recall": 0.25791221234861716,
+        "mean_candidates": 1.0,
+        "max_candidates": 1,
+        "refs_with_zero": 0,
+        "recall_India": 0.26322170025761477,
+        "recall_US": 0.2524604193410355
+      }
+    },
+    "stage1_top1": {
+      "dev": {
+        "recall": 0.26731666122872005,
+        "mean_candidates": 1.0,
+        "max_candidates": 1,
+        "refs_with_zero": 0,
+        "recall_India": 0.26625246249431733,
+        "recall_US": 0.2684093826584199
+      }
+    },
+    "emb_rank<=2": {
+      "dev": {
+        "recall": 0.4887818359787344,
+        "mean_candidates": 2.0,
+        "max_candidates": 2,
+        "refs_with_zero": 0,
+        "recall_India": 0.5025382633732384,
+        "recall_US": 0.47465670828957096
+      }
+    },
+    "stage1_top2": {
+      "dev": {
+        "recall": 0.5132142103141853,
+        "mean_candidates": 2.0,
+        "max_candidates": 2,
+        "refs_with_zero": 0,
+        "recall_India": 0.5121609334747689,
+        "recall_US": 0.5142957171198507
+      }
+    },
+    "emb_rank<=3": {
+      "dev": {
+        "recall": 0.6775041744237376,
+        "mean_candidates": 3.0,
+        "max_candidates": 3,
+        "refs_with_zero": 0,
+        "recall_India": 0.6934383997575391,
+        "recall_US": 0.6611428793713775
+      }
+    },
+    "stage1_top3": {
+      "dev": {
+        "recall": 0.7107652150547953,
+        "mean_candidates": 3.0,
+        "max_candidates": 3,
+        "refs_with_zero": 0,
+        "recall_India": 0.7097287467798151,
+        "recall_US": 0.7118294627922356
+      }
+    },
+    "emb_rank<=5": {
+      "dev": {
+        "recall": 0.9029230562539585,
+        "mean_candidates": 5.0,
+        "max_candidates": 5,
+        "refs_with_zero": 0,
+        "recall_India": 0.9101000151538112,
+        "recall_US": 0.8955537402263974
+      }
+    },
+    "stage1_top5": {
+      "dev": {
+        "recall": 0.9259735523866188,
+        "mean_candidates": 5.0,
+        "max_candidates": 5,
+        "refs_with_zero": 0,
+        "recall_India": 0.9263145931201697,
+        "recall_US": 0.9256233710662466
+      },
+      "holdout": {
+        "recall": 0.9261418292354457,
+        "mean_candidates": 5.0,
+        "max_candidates": 5,
+        "refs_with_zero": 0,
+        "recall_India": 0.9277159309021114,
+        "recall_US": 0.9245603208886146
+      }
+    },
+    "emb_rank<=8": {
+      "dev": {
+        "recall": 0.9822658963975203,
+        "mean_candidates": 8.0,
+        "max_candidates": 8,
+        "refs_with_zero": 0,
+        "recall_India": 0.9817396575238673,
+        "recall_US": 0.982806239545649
+      }
+    },
+    "stage1_top8": {
+      "dev": {
+        "recall": 0.9904612018501814,
+        "mean_candidates": 8.0,
+        "max_candidates": 8,
+        "refs_with_zero": 0,
+        "recall_India": 0.9903773298984695,
+        "recall_US": 0.99054732174116
+      }
+    },
+    "emb_rank<=10": {
+      "dev": {
+        "recall": 0.9884459628044451,
+        "mean_candidates": 10.0,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9881421427489013,
+        "recall_US": 0.9887579258567706
+      }
+    },
+    "stage1_top10": {
+      "dev": {
+        "recall": 0.9940694393796903,
+        "mean_candidates": 10.0,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9942415517502652,
+        "recall_US": 0.9938927140467577
+      },
+      "holdout": {
+        "recall": 0.9932279041132787,
+        "mean_candidates": 10.0,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.993742802303263,
+        "recall_US": 0.9927105831533477
+      }
+    },
+    "emb_rank<=15": {
+      "dev": {
+        "recall": 0.9930330307275973,
+        "mean_candidates": 15.0,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9932944385512956,
+        "recall_US": 0.9927646166413817
+      }
+    },
+    "stage1_top15": {
+      "dev": {
+        "recall": 0.9961422566838761,
+        "mean_candidates": 15.0,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9960978936202455,
+        "recall_US": 0.9961878087680398
+      }
+    },
+    "emb_rank<=20": {
+      "dev": {
+        "recall": 0.9948371494923517,
+        "mean_candidates": 20.0,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9952265494771935,
+        "recall_US": 0.9944373127941806
+      }
+    },
+    "stage1_top20": {
+      "dev": {
+        "recall": 0.9969099667965376,
+        "mean_candidates": 20.0,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9966282770116685,
+        "recall_US": 0.9971992064418251
+      },
+      "holdout": {
+        "recall": 0.9967101466004848,
+        "mean_candidates": 20.0,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9967754318618042,
+        "recall_US": 0.9966445541499537
+      }
+    },
+    "emb_rank<=30": {
+      "dev": {
+        "recall": 0.9959119436500777,
+        "mean_candidates": 30.0,
+        "max_candidates": 30,
+        "refs_with_zero": 0,
+        "recall_India": 0.9960978936202455,
+        "recall_US": 0.9957210098416773
+      }
+    },
+    "stage1_top30": {
+      "dev": {
+        "recall": 0.997639291403566,
+        "mean_candidates": 30.0,
+        "max_candidates": 30,
+        "refs_with_zero": 0,
+        "recall_India": 0.9972723139869677,
+        "recall_US": 0.9980161045629595
+      }
+    },
+    "emb_rank<=50": {
+      "dev": {
+        "recall": 0.9975049421338502,
+        "mean_candidates": 50.0,
+        "max_candidates": 50,
+        "refs_with_zero": 0,
+        "recall_India": 0.9977648128504318,
+        "recall_US": 0.9972381063523554
+      }
+    },
+    "stage1_top50": {
+      "dev": {
+        "recall": 0.9983686160105943,
+        "mean_candidates": 50.0,
+        "max_candidates": 50,
+        "refs_with_zero": 0,
+        "recall_India": 0.9981436581300197,
+        "recall_US": 0.9985996032209126
+      }
+    },
+    "adaptive_t0.001_min3_max10": {
+      "dev": {
+        "recall": 0.9938199335930753,
+        "mean_candidates": 8.521127694859038,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9940521291104712,
+        "recall_US": 0.993581514762516
+      }
+    },
+    "adaptive_t0.001_min3_max15": {
+      "dev": {
+        "recall": 0.9956048596050131,
+        "mean_candidates": 10.534660033167496,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9956432792847401,
+        "recall_US": 0.9955654101995566
+      }
+    },
+    "adaptive_t0.001_min3_max20": {
+      "dev": {
+        "recall": 0.9961230639310596,
+        "mean_candidates": 11.565505804311774,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9959084709804515,
+        "recall_US": 0.9963434084101607
+      }
+    },
+    "adaptive_t0.001_min3_max30": {
+      "dev": {
+        "recall": 0.9963917624704911,
+        "mean_candidates": 12.175854063018242,
+        "max_candidates": 30,
+        "refs_with_zero": 0,
+        "recall_India": 0.9961357781482043,
+        "recall_US": 0.9966546076944023
+      }
+    },
+    "adaptive_t0.005_min3_max10": {
+      "dev": {
+        "recall": 0.99213097134522,
+        "mean_candidates": 6.940298507462686,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9921579027125322,
+        "recall_US": 0.9921033181623682
+      }
+    },
+    "adaptive_t0.005_min3_max15": {
+      "dev": {
+        "recall": 0.9927451394353493,
+        "mean_candidates": 7.268192371475954,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9927261706319139,
+        "recall_US": 0.9927646166413817
+      }
+    },
+    "adaptive_t0.005_min3_max20": {
+      "dev": {
+        "recall": 0.9927835249409823,
+        "mean_candidates": 7.290414593698176,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9927261706319139,
+        "recall_US": 0.9928424164624421
+      }
+    },
+    "adaptive_t0.005_min3_max30": {
+      "dev": {
+        "recall": 0.9927835249409823,
+        "mean_candidates": 7.293134328358209,
+        "max_candidates": 30,
+        "refs_with_zero": 0,
+        "recall_India": 0.9927261706319139,
+        "recall_US": 0.9928424164624421
+      }
+    },
+    "adaptive_t0.01_min3_max10": {
+      "dev": {
+        "recall": 0.9902308888163829,
+        "mean_candidates": 6.018242122719735,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9899984846188816,
+        "recall_US": 0.9904695219200996
+      }
+    },
+    "adaptive_t0.01_min3_max15": {
+      "dev": {
+        "recall": 0.9903652380860987,
+        "mean_candidates": 6.069519071310116,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9900363691468405,
+        "recall_US": 0.9907029213832809
+      }
+    },
+    "adaptive_t0.01_min3_max20": {
+      "dev": {
+        "recall": 0.9903652380860987,
+        "mean_candidates": 6.071641791044776,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9900363691468405,
+        "recall_US": 0.9907029213832809
+      }
+    },
+    "adaptive_t0.01_min3_max30": {
+      "dev": {
+        "recall": 0.9903652380860987,
+        "mean_candidates": 6.0727031509121066,
+        "max_candidates": 30,
+        "refs_with_zero": 0,
+        "recall_India": 0.9900363691468405,
+        "recall_US": 0.9907029213832809
+      }
+    },
+    "adaptive_t0.02_min3_max10": {
+      "dev": {
+        "recall": 0.9867378078037733,
+        "mean_candidates": 5.238275290215589,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9860963782391271,
+        "recall_US": 0.9873964289882133
+      }
+    },
+    "adaptive_t0.02_min3_max15": {
+      "dev": {
+        "recall": 0.9867761933094064,
+        "mean_candidates": 5.246500829187396,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9860963782391271,
+        "recall_US": 0.9874742288092737
+      }
+    },
+    "adaptive_t0.02_min3_max20": {
+      "dev": {
+        "recall": 0.9867761933094064,
+        "mean_candidates": 5.247562189054726,
+        "max_candidates": 20,
+        "refs_with_zero": 0,
+        "recall_India": 0.9860963782391271,
+        "recall_US": 0.9874742288092737
+      }
+    },
+    "adaptive_t0.02_min3_max30": {
+      "dev": {
+        "recall": 0.9867761933094064,
+        "mean_candidates": 5.24849087893864,
+        "max_candidates": 30,
+        "refs_with_zero": 0,
+        "recall_India": 0.9860963782391271,
+        "recall_US": 0.9874742288092737
+      }
+    },
+    "adaptive_t0.05_min3_max10": {
+      "dev": {
+        "recall": 0.982400245667236,
+        "mean_candidates": 4.7518407960199,
+        "max_candidates": 10,
+        "refs_with_zero": 0,
+        "recall_India": 0.9818911956357024,
+        "recall_US": 0.9829229392772396
+      }
+    },
+    "adaptive_t0.05_min3_max15": {
+      "dev": {
+        "recall": 0.9824386311728691,
+        "mean_candidates": 4.754162520729685,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9818911956357024,
+        "recall_US": 0.9830007390983001
+      }
+    },
+    "adaptive_t0.05_min3_max20": {
+      "dev": {
+        "recall": 0.9824386311728691,
+        "mean_candidates": 4.754162520729685,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9818911956357024,
+        "recall_US": 0.9830007390983001
+      }
+    },
+    "adaptive_t0.05_min3_max30": {
+      "dev": {
+        "recall": 0.9824386311728691,
+        "mean_candidates": 4.754162520729685,
+        "max_candidates": 15,
+        "refs_with_zero": 0,
+        "recall_India": 0.9818911956357024,
+        "recall_US": 0.9830007390983001
+      }
+    }
+  },
+  "seconds": 246.4179395539686
+}

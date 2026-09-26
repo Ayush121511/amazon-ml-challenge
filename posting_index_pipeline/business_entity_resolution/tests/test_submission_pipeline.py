@@ -265,6 +265,31 @@ class PipelineTests(unittest.TestCase):
                                        output=merged, exclusive=True, country_threshold=''))
         for name in ('matching_results.tsv', 'candidate_pairs.tsv'):
             self.assertEqual((merged / name).read_text(encoding='utf-8'), (out / name).read_text(encoding='utf-8'))
+        # Variants: one pass, stage-1 pruning (top-2 and adaptive), one output folder each.
+        import xgboost as xgb
+        from prune_analysis import STAGE1_FEATURES
+        cols = [FEATURE_NAMES.index(f) for f in STAGE1_FEATURES]
+        stage1 = xgb.train({'objective': 'binary:logistic', 'max_depth': 2, 'verbosity': 0},
+                           xgb.DMatrix(x[:, cols], y), num_boost_round=5)
+        stage1.save_model(str(self.root / 'stage1.json'))
+        spec = self.root / 'variants.json'
+        spec.write_text(json.dumps({'stage1': str(self.root / 'stage1.json'), 'variants': [
+            {'name': 'top2', 'rule': 'top', 'k': 2, 'model': str(model)},
+            {'name': 'adaptive', 'rule': 'adaptive', 't': 0.5, 'min': 1, 'max': 3, 'model': str(model)}]}))
+        var_out = self.root / 'out_variants'
+        stage_predict(argparse.Namespace(data=self.root, index=self.index_root, output=var_out,
+                                         split='test', model=model, limit=0, keep=0, top_k=10,
+                                         top_terms=64, batch=2, threads=1, sample=0, shard='',
+                                         sample_seed='s', exclusive=True, reverse=None, ref_index=None,
+                                         country_threshold='', variants=spec))
+        for name, cap in (('top2', 2), ('adaptive', 3)):
+            with open(var_out / name / 'candidate_pairs.tsv', encoding='utf-8', newline='') as f:
+                cands = {r[0]: set(filter(None, r[1].split(','))) for r in list(csv.reader(f, delimiter='	'))[1:]}
+            with open(var_out / name / 'matching_results.tsv', encoding='utf-8', newline='') as f:
+                found = {r[0]: set(filter(None, r[1].split(','))) for r in list(csv.reader(f, delimiter='	'))[1:]}
+            self.assertEqual(sorted(cands), ['S1-1', 'S1-2', 'S1-3', 'S1-4', 'S1-5'])
+            self.assertTrue(all(len(v) <= cap for v in cands.values()))
+            self.assertTrue(all(found[k] <= cands[k] for k in found))
         # A per-country cutoff above any probability removes that country's matches only.
         strict = self.root / 'merged_strict'
         stage_merge(argparse.Namespace(data=self.root, split='test', model=model, shards=shards,

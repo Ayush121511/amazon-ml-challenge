@@ -676,6 +676,8 @@ def stage_train(a):
         partition = {s: ('unused' if q == 'train' and s not in keep_ids else q) for s, q in partition.items()}
     pair_part = np.array([partition[s] for s in pair_ref], dtype=object)
     in_range = (x[:, names.index('fused_rank')] <= a.max_rank) if a.max_rank else np.ones(len(y), bool)
+    if getattr(a, 'row_mask', None):
+        in_range &= np.load(a.row_mask)  # e.g. stage-1 pruned candidates (prune_analysis.py)
     m = {p: (pair_part == p) & in_range for p in ('train', 'dev', 'holdout')}
     scorer, params, best_iteration = fit_matcher(a, x[m['train']], y[m['train']], x[m['dev']], y[m['dev']], names)
 
@@ -753,45 +755,84 @@ def stage_predict(a):
         refs = refs[i::n]
     position = {r['entity_id']: i for i, r in enumerate(refs)}
     a.output.mkdir(parents=True)
-    cands_out = {r['entity_id']: '' for r in refs}
-    kept = {'ref': [], 'target': [], 'prob': []}
-    stats = Counter()
+    # Variants: one pass computes features (the expensive part) once, then each variant prunes
+    # the candidates with the stage-1 ranker (prune_analysis.py) and scores them with its own
+    # matcher. Without --variants there is a single variant that keeps every candidate.
+    stage1 = stage1_cols = None
+    if getattr(a, 'variants', None):
+        spec = json.loads(Path(a.variants).read_text())
+        from prune_analysis import STAGE1_FEATURES
+        import xgboost as xgb
+        stage1_booster = xgb.Booster()
+        stage1_booster.load_model(spec['stage1'])
+        stage1_booster.set_param({'device': 'cuda' if gpu_available() else 'cpu', 'nthread': a.threads})
+        stage1 = Scorer('xgboost', stage1_booster, a.threads)
+        stage1_cols = [FEATURE_NAMES.index(f) for f in STAGE1_FEATURES]
+        variants = []
+        for v in spec['variants']:
+            model_dir = Path(v['model'])
+            variants.append({**v, 'scorer': load_scorer(model_dir, a.threads),
+                             'report': json.loads((model_dir / 'report.json').read_text())})
+    else:
+        variants = [{'name': None, 'rule': 'all', 'scorer': booster, 'report': model_report}]
+    for v in variants:
+        v['cands'] = {r['entity_id']: '' for r in refs}
+        v['kept'] = {'ref': [], 'target': [], 'prob': []}
+        v['stats'] = Counter()
 
     def consume(batch, cands, x, table):
         if cands is None or x is None:
-            stats['refs_without_candidates'] += len(batch)
+            for v in variants:
+                v['stats']['refs_without_candidates'] += len(batch)
             return
-        prob = booster.predict(x).astype(np.float32)
         ids = table.fields['entity_id'][cands['ord']]
-        bounds = np.searchsorted(cands['ref'], np.arange(len(batch) + 1))  # grouped by ref
-        for i, r in enumerate(batch):
-            cands_out[r['entity_id']] = ','.join(ids[bounds[i]:bounds[i + 1]])
-        # Pairs this unlikely can never be selected; drop them to bound memory.
-        m = prob >= 0.02
-        kept['ref'].append(np.array([position[batch[i]['entity_id']] for i in cands['ref'][m]], dtype=np.int64))
-        kept['target'].append(ids[m])
-        kept['prob'].append(prob[m])
-        stats['pairs'] += len(prob)
+        if stage1 is not None:
+            from prune_analysis import rank_within
+            s1 = stage1.predict(x[:, stage1_cols]).astype(np.float32)
+            rank = rank_within(cands['ref'], s1)
+        for v in variants:
+            if v['rule'] == 'top':
+                keep = rank <= v['k']
+            elif v['rule'] == 'adaptive':
+                keep = (rank <= v['min']) | ((s1 >= v['t']) & (rank <= v['max']))
+            else:
+                keep = np.ones(len(ids), dtype=bool)
+            sub_ref, sub_ids = cands['ref'][keep], ids[keep]
+            prob = v['scorer'].predict(x[keep]).astype(np.float32) if keep.any() else np.zeros(0, np.float32)
+            bounds = np.searchsorted(sub_ref, np.arange(len(batch) + 1))  # grouped by ref
+            for i, r in enumerate(batch):
+                v['cands'][r['entity_id']] = ','.join(sub_ids[bounds[i]:bounds[i + 1]])
+            # Pairs this unlikely can never be selected; drop them to bound memory.
+            m = prob >= 0.02
+            v['kept']['ref'].append(np.array([position[batch[i]['entity_id']] for i in sub_ref[m]], dtype=np.int64))
+            v['kept']['target'].append(sub_ids[m])
+            v['kept']['prob'].append(prob[m])
+            v['stats']['pairs'] += len(prob)
 
     timing = generate(a.index, a.data, a.split, refs, a, consume)
-    ref_idx = np.concatenate(kept['ref']) if kept['ref'] else np.zeros(0, np.int64)
-    target = np.concatenate(kept['target']) if kept['target'] else np.zeros(0, object)
-    prob = np.concatenate(kept['prob']) if kept['prob'] else np.zeros(0, np.float32)
     params = {k: str(v) for k, v in vars(a).items()}
-    if a.shard:
-        # Exclusivity and the decision rule need every reference: `merge` does them.
-        ids = np.array([r['entity_id'] for r in refs])
-        np.savez(a.output / 'scores.npz', ref=ids[ref_idx], target=target.astype(str), prob=prob)
-        with open(a.output / 'candidates.tsv', 'w', encoding='utf-8', newline='') as f:
-            for r in refs:
-                f.write(r['entity_id'] + '\t' + cands_out[r['entity_id']] + '\n')
-        (a.output / 'report.json').write_text(json.dumps(
-            {'shard': a.shard, 'references': len(refs), 'stats': dict(stats), 'timing': timing,
-             'seconds': time.monotonic() - started, 'parameters': params}, indent=2))
-        return
-    finalize(refs, cands_out, ref_idx, target, prob, model_report, a.exclusive, a.output, stats,
-             {'split': a.split, 'timing': timing, 'started': started, 'parameters': params},
-             parse_country_thresholds(a.country_threshold))
+    for v in variants:
+        out = a.output / v['name'] if v['name'] else a.output
+        out.mkdir(parents=True, exist_ok=True)
+        kept = v['kept']
+        ref_idx = np.concatenate(kept['ref']) if kept['ref'] else np.zeros(0, np.int64)
+        target = np.concatenate(kept['target']) if kept['target'] else np.zeros(0, object)
+        prob = np.concatenate(kept['prob']) if kept['prob'] else np.zeros(0, np.float32)
+        if a.shard:
+            # Exclusivity and the decision rule need every reference: `merge` does them.
+            ids = np.array([r['entity_id'] for r in refs])
+            np.savez(out / 'scores.npz', ref=ids[ref_idx], target=target.astype(str), prob=prob)
+            with open(out / 'candidates.tsv', 'w', encoding='utf-8', newline='') as f:
+                for r in refs:
+                    f.write(r['entity_id'] + '\t' + v['cands'][r['entity_id']] + '\n')
+            (out / 'report.json').write_text(json.dumps(
+                {'shard': a.shard, 'variant': v['name'], 'references': len(refs), 'stats': dict(v['stats']),
+                 'timing': timing, 'seconds': time.monotonic() - started, 'parameters': params}, indent=2))
+            continue
+        finalize(refs, v['cands'], ref_idx, target, prob, v['report'], a.exclusive, out, v['stats'],
+                 {'split': a.split, 'variant': v['name'], 'timing': timing, 'started': started,
+                  'parameters': params},
+                 parse_country_thresholds(a.country_threshold))
 
 
 def stage_merge(a):
@@ -935,6 +976,8 @@ def main():
                    help='Do not restrict each target to its most probable reference')
     s.add_argument('--shard', default='', help='i/n: score every n-th reference from i; finish with `merge`')
     s.add_argument('--country-threshold', default='', help='Per-country decision cutoffs, e.g. France=0.5')
+    s.add_argument('--variants', type=Path, help='JSON: {"stage1": model.json, "variants": [{name, rule: top|adaptive, '
+                   'k | t,min,max, model}]}; writes one output folder per variant')
     s = sub.add_parser('merge')
     s.add_argument('--data', type=Path, required=True)
     s.add_argument('--split', choices=['train', 'test'], default='test')
@@ -958,6 +1001,7 @@ def main():
     s.add_argument('--learning-rate', type=float, default=0.05)
     s.add_argument('--min-data-in-leaf', type=int, default=100)
     s.add_argument('--early-stopping', type=int, default=50)
+    s.add_argument('--row-mask', type=Path, help='Boolean .npy: train/evaluate only on these pair rows')
     s.add_argument('--backend', choices=['lightgbm', 'xgboost'], default='lightgbm',
                    help='xgboost trains/scores on the GPU when one is available')
     s.add_argument('--threads', type=int, default=8)

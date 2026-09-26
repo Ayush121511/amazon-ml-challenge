@@ -172,6 +172,56 @@ It reports recall and throughput without a target rescan. All 22 local tests
 passed. **Padum benchmark pending**; do not claim its recall or scalability
 until the report is checked.
 
+## Candidate pruning (26 Sep afternoon): the organizers now rank smaller candidate sets higher
+
+- Leaderboard: v4 scored **0.964** (holdout 0.9731); the top teams are at about **0.993**.
+- `src/prune_analysis.py` (job `1066505`): a stage-1 XGBoost ranker on **retrieval signals only**,
+  trained out-of-fold on train. Holdout results (same 15,113 references; final XGBoost
+  retrained per candidate set with `train --row-mask`):
+
+  | Candidate set | Per reference | Holdout recall | Holdout F0.5 |
+  |---|---:|---:|---:|
+  | v4 all | 289 | 99.88% | 0.9731 |
+  | stage-1 top 20 | 20 | 99.67% | 0.9732 |
+  | stage-1 top 10 | 10 | 99.32% | 0.9728 |
+  | adaptive p≥0.002 min3 max15 (`1066508`) | 9.0 | 99.47% | 0.9722 |
+  | **adaptive p≥0.005 min3 max15** | **7.2** | 99.28% | **0.9728** |
+  | stage-1 top 5 | 5 | 92.61% | 0.9659 |
+
+  Outputs: `artifacts/prune_v1/` (stage1.json, stage1_scores.npy, masks, model_top{5,10,20}, model_adaptive_*).
+- Test-set behaviour (label-free): predicted match-count distribution ≈ train ground truth; France is
+  as confident as US/India. The 0.9-point holdout→test drop is most likely precision on test
+  (more distractor targets per reference: 5.75 vs 4.68).
+- **v5 test run DONE (18:00), all three variants validator PASS (both files + `--check-ids`):**
+
+  | Variant | Test candidates per reference | candidate_pairs | No-match | Holdout F0.5 |
+  |---|---:|---:|---:|---:|
+  | top20 | 20.0 | 469 MB | 94,974 | 0.9732 |
+  | top10 | 10.0 | 246 MB | 97,426 | 0.9728 |
+  | adaptive7 | about 8.0 (FR 9.77, IN 8.09, US 7.29) | 202 MB | 97,253 | 0.9728 |
+
+  Matches per reference are 3.34-3.35 in every country and variant. Outputs are in
+  `artifacts/submission_v5_{top20,top10,adaptive7}/`; per-shard scores (p ≥ 0.02) are in
+  `full_v5_s{0,1}/<variant>/scores.npz`. Recommended final: **adaptive7** (smallest, same holdout F0.5).
+  Late fusion with Ayush's cross-encoder can use the saved scores; a feature dump (x.npy for test)
+  is needed only for feature-level fusion.
+- (was) **Running (from about 16:10):** test shards `1066517`/`1066518` with `predict --variants
+  padum/variants_prune_v1.json`. One feature pass produces the top20, top10 and adaptive7 variants,
+  each scored by its own matcher; the second shard merges and validates each →
+  `artifacts/submission_v5_{top20,top10,adaptive7}/`. Scores are kept (`full_v5_s*/<variant>/`).
+- Not yet pushed to GitHub (the user wants to push after testing): `prune_analysis.py`, `--row-mask`,
+  `--variants`, `padum/prune_check.pbs`, `prune_adaptive.pbs`, `variants_prune_v1.json`.
+
+## Disk cleanup (26 Sep, 14:30, the user's decision)
+
+Scratch 100.4 → **73.4 GB**. Deleted: `matcher_v2/` (its `pairs/reference_ids.txt` exclusion list
+was kept), `full_v4_s0/s1` (so **re-merging now requires re-scoring the test set**),
+`posting_index_v1/train_index_t` + `test_index_t` (superseded by `_c`), `padum/gpu_wheels/`
+(the packages stay installed in `~/scratch/miniconda3/envs/amlc` = `.conda-er`), the duplicate
+`submission_v4/`, `sweep_retrieval_v1`, and empty folders; `train_query_10000/` keeps only its
+`reference_ids.txt`. Kept: submission_v4_final, matcher_v4, dense_v1, train/test `_c` indexes,
+the reference indexes, `*_reverse_t`, preprocessed_v2, models/.
+
 ## FINAL (26 Sep, 05:10): validated submission files ready
 
 - `artifacts/submission_v4_final/matching_results.tsv` (97 MB, sha256 6327cae1…, identical to
@@ -294,7 +344,7 @@ until the report is checked.
 
 Team repo: https://github.com/Ayush121511/amazon-ml-challenge (public; default
 branch `eda`; teammate branch `ayush-progress`). This workstream is on branch
-**`vishal-progress`** (v2 commit `a18a71e`, 25 Sep; **v4 commit `9b74a5c`, 26 Sep: embeddings + XGBoost GPU, holdout 0.9731**), entirely inside
+**`vishal-progress`** (v2 commit `a18a71e`, 25 Sep; **v4 commit `9b74a5c`, 26 Sep: embeddings + XGBoost GPU, holdout 0.9731; final-submission commit `13dc8d2`: test stats + validator PASS**), entirely inside
 `posting_index_pipeline/`: pipeline code, 42 tests, Padum job scripts, docs and
 aggregate result reports (`results/v1`, `results/v2`, test dry run). No data,
 artifacts or per-record miss files. Superseded experiments were left out. To

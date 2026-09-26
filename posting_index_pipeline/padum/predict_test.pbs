@@ -22,6 +22,7 @@ if [ -n "${SAMPLE:-}" ]; then EXTRA+=(--sample "$SAMPLE"); fi
 if [ -n "${SHARD:-}" ]; then EXTRA+=(--shard "$SHARD"); fi
 if [ -n "${REVERSE:-}" ]; then EXTRA+=(--ref-index $PIDX/test_ref_index --reverse $PIDX/test_reverse_t); fi
 if [ -n "${DENSE:-}" ]; then EXTRA+=(--dense "$DENSE"); fi
+if [ -n "${VARIANTS:-}" ]; then EXTRA+=(--variants "$VARIANTS"); fi
 # BUILD_INDEX=1 builds the test index first; WAIT_INDEX=1 waits until another job has built it.
 if [ -n "${BUILD_INDEX:-}" ] && [ ! -e "$PIDX/${INDEX:-test_index_t}" ]; then
   "$PYTHON" -u business_entity_resolution/src/posting_index.py --data artifacts/preprocessed_v2/test     --split test --output "$PIDX/${INDEX}" --workers $(( ${NCPUS:-8} - 1 )) --chunk-rows 50000     --max-df-fraction 0.005 --min-max-df 1000
@@ -39,7 +40,23 @@ if [ -z "${SAMPLE:-}" ] && [ -z "${SHARD:-}" ]; then
 fi
 # Sharded runs: the shard that finishes second merges (global exclusivity + decision) and
 # validates, so no separate merge job is needed (scai_q allows only 2 jobs per user).
-if [ -n "${SHARD:-}" ] && [ -n "${MERGE_RUN:-}" ] && [ -n "${OTHER:-}" ]; then
+if [ -n "${SHARD:-}" ] && [ -n "${MERGE_RUN:-}" ] && [ -n "${OTHER:-}" ] && [ -n "${VARIANTS:-}" ]; then
+  # Variants: merge + validate each variant separately, each with its own matcher.
+  SR=6ab10eb3b23ba_student_resource/student_resource
+  for V in $("$PYTHON" -c "import json,sys; print(' '.join(v['name'] + ':' + v['model'] for v in json.load(open(sys.argv[1]))['variants']))" "$VARIANTS"); do
+    NAME=${V%%:*}; VMODEL=${V#*:}; MOUT=artifacts/${MERGE_RUN}_$NAME
+    if [ -f "$OTHER/$NAME/report.json" ] && [ ! -e "$MOUT" ]; then
+      "$PYTHON" -u business_entity_resolution/src/submission_pipeline.py merge --data artifacts/preprocessed_v2/test         --split test --model "$VMODEL" --shards "$OUT/$NAME" "$OTHER/$NAME" --output "$MOUT"
+      echo "=== validator $NAME: both files"
+      "$PYTHON" $SR/utils/validate_submission.py --matching "$MOUT/matching_results.tsv"         --candidate "$MOUT/candidate_pairs.tsv" --test-dir $SR/dataset/test
+      echo "=== validator $NAME: --check-ids"
+      "$PYTHON" $SR/utils/validate_submission.py --matching "$MOUT/matching_results.tsv"         --candidate /nonexistent --test-dir $SR/dataset/test --check-ids
+      ls -l "$MOUT"
+    else
+      echo "Variant $NAME: other shard not finished yet (or merge exists): it will merge."
+    fi
+  done
+elif [ -n "${SHARD:-}" ] && [ -n "${MERGE_RUN:-}" ] && [ -n "${OTHER:-}" ]; then
   if [ -f "$OTHER/report.json" ] && [ ! -e "artifacts/$MERGE_RUN" ]; then
     "$PYTHON" -u business_entity_resolution/src/submission_pipeline.py merge       --data artifacts/preprocessed_v2/test --split test --model "$MODEL"       --shards "$OUT" "$OTHER" --output "artifacts/$MERGE_RUN" ${COUNTRY_THRESHOLD:+--country-threshold "$COUNTRY_THRESHOLD"}
     SR=6ab10eb3b23ba_student_resource/student_resource

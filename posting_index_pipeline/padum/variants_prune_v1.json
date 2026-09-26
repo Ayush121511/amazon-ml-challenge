@@ -1,0 +1,25 @@
+{
+ "stage1": "artifacts/prune_v1/stage1.json",
+ "variants": [
+  {
+   "name": "top20",
+   "rule": "top",
+   "k": 20,
+   "model": "artifacts/prune_v1/model_top20"
+  },
+  {
+   "name": "top10",
+   "rule": "top",
+   "k": 10,
+   "model": "artifacts/prune_v1/model_top10"
+  },
+  {
+   "name": "adaptive7",
+   "rule": "adaptive",
+   "t": 0.005,
+   "min": 3,
+   "max": 15,
+   "model": "artifacts/prune_v1/model_adaptive_t0.005_min3_max15"
+  }
+ ]
+}

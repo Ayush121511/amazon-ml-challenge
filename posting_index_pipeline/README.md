@@ -25,6 +25,37 @@ reference. In its loss analysis, a perfect matcher over the same candidates woul
 score 0.9996, so blocking costs only 0.04 points; what remains is the matcher
 rejecting some true candidates (1.7 pts) and false matches (0.8 pts).
 
+## Candidate pruning (v5, 26 Sep 2026): small candidate sets, same F0.5
+
+The organizers now rank smaller `candidate_pairs.tsv` sets higher. v5 adds a **second blocking
+stage**: a stage-1 XGBoost ranker on **retrieval signals only** (route scores and ranks, reverse
+ranks, embedding cosine and ranks; no string similarity), trained out-of-fold on the train split
+(`src/prune_analysis.py`). The final XGBoost is retrained on each pruned set
+(`train --row-mask`). Holdout: same 15,113 references as v4.
+
+| Candidate set | Per reference | Holdout recall | Holdout F0.5 |
+|---|---:|---:|---:|
+| v4 (no pruning) | 289 | 99.88% | 0.9731 |
+| stage-1 top 20 | 20 | 99.67% | 0.9732 |
+| stage-1 top 10 | 10 | 99.32% | 0.9728 |
+| adaptive (rank ≤ 3, or p ≥ 0.005 and rank ≤ 15) | 7.2 | 99.28% | 0.9728 |
+| stage-1 top 5 | 5 | 92.61% | 0.9659 |
+
+The final test run produced all three shortlisted sets in one pass (`predict --variants
+padum/variants_prune_v1.json`), each scored by its own matcher; the validator passes on all of
+them (both files + `--check-ids`):
+
+| Variant | Test candidates per reference | candidate_pairs.tsv | No-match | Matches per reference |
+|---|---:|---:|---:|---:|
+| top20 | 20.0 | 469 MB | 5.5% | 3.35 |
+| top10 | 10.0 | 246 MB | 5.6% | 3.34 |
+| adaptive7 | about 8.0 (France 9.8, India 8.1, US 7.3) | 202 MB | 5.6% | 3.34 |
+
+Leaderboard: v4 (unpruned) scored **0.964** (holdout 0.9731). Reports are in `results/prune_v1/`
+and `results/final_test_v5/`. Job scripts: `padum/prune_check.pbs`, `prune_adaptive.pbs`,
+`predict_test.pbs` (`VARIANTS=`). `src/make_matcher_pack.py` packages the pruned dev set for matcher
+work; it contains IDs, features and labels, so share it privately and do not commit it.
+
 ## Final test submission (v4, 26 Sep 2026)
 
 Model: v4 XGBoost (GPU) on lexical + reverse + dense candidates; decision rule expected-F0.5
@@ -122,6 +153,7 @@ Dependencies: `requirements.txt` in this folder.
 | `v1/*` | The same for v1, the baseline |
 | `test_dryrun_v1/report.json` | 100k-reference test dry run: per-country no-match rate / matches, timing |
 | `blocking_sweep_terms64_k200_report.json` | Chosen blocking settings on 2,000 references |
+| `prune_v1/`, `final_test_v5/` | v5 pruning study (recall vs candidates, per-set models) and final test reports for the three candidate sets |
 | `final_test/` | Final test run: per-country prediction stats + organizer validator output (PASS) |
 | `research_samples/` | Shared reference-ID lists (fixed seeds) and the same-sample comparison with the sparse TF-IDF baseline |
 

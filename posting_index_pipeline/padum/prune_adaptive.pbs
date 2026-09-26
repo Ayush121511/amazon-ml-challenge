@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -N er_prune_ad
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=96gb:centos=amdepyc
+#PBS -l walltime=03:00:00
+#PBS -j oe
+# Adaptive stage-1 pruning: keep a candidate if rank <= MIN or (stage-1 p >= T and rank <= MAX),
+# then retrain the final XGBoost on those rows and report holdout macro F0.5. Uses the
+# out-of-fold stage-1 scores saved by prune_analysis.py. VARIANTS=T:MIN:MAX;T:MIN:MAX
+# Usage: qsub padum/prune_adaptive.pbs
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="$PWD/.conda-er/bin/python"
+N="${NCPUS:-8}"
+SRC=business_entity_resolution/src
+PAIRS=artifacts/matcher_v4/pairs
+OUT=artifacts/prune_v1
+for V in ${VARIANTS:-0.005:3:15 0.002:3:15}; do
+  IFS=: read T MIN MAX <<< "$V"
+  NAME=adaptive_t${T}_min${MIN}_max${MAX}
+  cd $SRC && "$PY" - "$T" "$MIN" "$MAX" "$NAME" <<'PYEOF'
+import sys, json
+import numpy as np, pandas as pd
+from prune_analysis import rank_within, partition_of
+t, lo, hi, name = float(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+base = '../../artifacts'
+s1 = np.load(f'{base}/prune_v1/stage1_scores.npy')
+refs = pd.read_csv(f'{base}/matcher_v4/pairs/pairs.tsv.gz', sep='\t', header=None, usecols=[0], dtype=str)[0]
+codes, names = pd.factorize(refs)
+rank = rank_within(codes.astype(np.int64), s1)
+mask = (rank <= lo) | ((s1 >= t) & (rank <= hi))
+np.save(f'{base}/prune_v1/mask_{name}.npy', mask)
+y = np.load(f'{base}/matcher_v4/pairs/y.npy')
+gold = json.load(open(f'{base}/matcher_v4/pairs/gold.json'))
+part = np.array([partition_of(s) for s in names], dtype=object)
+for p in ('dev', 'holdout'):
+    rows = part[codes] == p
+    total = sum(len(gold[s]) for s in names[part == p])
+    kept = np.bincount(codes[rows & mask], minlength=len(names))[part == p]
+    print(f'MASK {name} {p}: recall {y[rows & mask].sum() / total:.4f} mean_candidates {kept.mean():.2f} '
+          f'p50 {np.median(kept):.0f} p90 {np.percentile(kept, 90):.0f} max {kept.max()}', flush=True)
+PYEOF
+  cd "$HOME/scratch/amazon_ml_2026"
+  test -e $OUT/model_$NAME || "$PY" -u $SRC/submission_pipeline.py train --pairs $PAIRS --output $OUT/model_$NAME \
+    --row-mask $OUT/mask_$NAME.npy --max-rank 200 --backend xgboost --rounds 4000 --num-leaves 255 \
+    --learning-rate 0.05 --early-stopping 100 --threads "$N" > $OUT/train_$NAME.log 2>&1
+  "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); print('RESULT', sys.argv[2], 'dev', round(r['macro_f05_dev'],4), 'holdout', round(r['macro_f05_holdout'],4), {c: round(v['macro_f05'],4) for c, v in r['holdout_by_country'].items()}, r['decision'], 'iter', r['best_iteration'])" $OUT/model_$NAME/report.json $NAME
+done
