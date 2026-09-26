@@ -21,3 +21,7 @@ submissions/*.csv
 
 # HPC credentials - never commit real Kerberos password
 references/hpc/*.local.sh
+
+# large local data / experiment outputs
+artifacts/
+data/vishal_v4_artifacts/

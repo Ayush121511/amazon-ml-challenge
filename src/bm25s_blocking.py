@@ -7,7 +7,9 @@ saturation + length normalization vs plain TF-IDF cosine similarity).
 import bm25s
 import pandas as pd
 
-NGRAM_RANGE = (2, 4)
+NGRAM_RANGE = (2, 4)  # reverted from (3,4): GPU matmul already solves the CPU speed problem (8x, validated),
+# so we don't need to trade recall for it -- (2,4) keeps the +0.04pt recall (2,4) had over (3,4) on dev sample.
+# Cached indexes (data/processed/bm25_indexes/) were built with (2,4); this must match at query time.
 
 
 def char_ngrams(text, ngram_range=NGRAM_RANGE):
