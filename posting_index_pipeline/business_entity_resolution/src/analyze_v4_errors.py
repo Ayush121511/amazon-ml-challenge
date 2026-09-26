@@ -59,6 +59,7 @@ def score_and_errors(refs, ref_idx, targets, labels, prob, gold, rule, threshold
             'blocking_missed_links': gold_links - candidate_true_links,
             'predicted_links': int(chosen.sum()),
             'missed_true_links': int(missed.sum()), 'false_positive_links': int(false.sum()),
+            'all_pair_probability_bins': bins(np.ones(len(prob), dtype=bool)),
             'missed_true_probability_bins': bins(missed),
             'false_positive_probability_bins': bins(false)}
 
