@@ -1,0 +1,34 @@
+#!/bin/bash
+#PBS -N er_v5_dev
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=96gb:centos=amdepyc
+#PBS -l walltime=03:00:00
+#PBS -j oe
+# Controlled dev-only experiments on unchanged saved v4 pairs.
+# Writes small models/reports; no indexes, embeddings or candidate matrices are rebuilt.
+set -euo pipefail
+cd "$HOME/scratch/amazon_ml_2026"
+test -n "${PBS_JOBID:-}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+PY="${V5_PYTHON:-$PWD/.conda-er/bin/python}"
+CODE="${V5_CODE:-$PWD/tapan_v5}"
+SHARED="${V4_ROOT:-/home/scai/mtech/aib262467/scratch/amazon_ml_2026}"
+SRC="$CODE/business_entity_resolution/src"
+PAIRS="$SHARED/artifacts/matcher_v4/pairs"
+OUT=artifacts/tapan_v5_weighting
+test ! -e "$OUT" || { echo "Output exists: $OUT; inspect it before running again"; exit 1; }
+for FILE in x.npy y.npy pairs.tsv.gz gold.json countries.json report.json; do
+  test -r "$PAIRS/$FILE" || { echo "Cannot read $PAIRS/$FILE; ask owner for read access"; exit 1; }
+done
+"$PY" -c "import xgboost, torch; assert torch.cuda.is_available(), 'GPU required'; print(xgboost.__version__, torch.cuda.get_device_name(0))"
+mkdir -p "$OUT"
+"$PY" -u "$SRC/preflight_v4_caches.py" --root "$SHARED" --output "$OUT/cache_preflight.json"
+for POWER in 0 0.5 1; do
+  /usr/bin/time -v "$PY" -u "$SRC/submission_pipeline.py" train \
+    --pairs "$PAIRS" --output "$OUT/weight_$POWER" \
+    --max-rank 200 --backend xgboost --num-leaves 255 --learning-rate 0.05 \
+    --rounds 4000 --early-stopping 100 --threads 8 \
+    --reference-weight-power "$POWER" --threshold-step 0.01 --dev-only
+done
+echo "Compare dev scores in $OUT/weight_*/report.json. Holdout was not scored."

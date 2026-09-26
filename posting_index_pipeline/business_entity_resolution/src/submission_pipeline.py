@@ -24,13 +24,15 @@ import numpy as np
 
 from posting_index import CountryIndex, country_dir, load_manifest, raw_counts, route_text, weigh, ROUTES, records
 from transliterate import phonetic, transliterate
+from matcher_experiments import decision_grid, reference_weights
 
 TARGET_FIELDS = ('entity_id', 'name_norm', 'name_folded', 'address_folded',
                  'address_numbers', 'postal_candidates', 'address_missing')
 RRF_K = 60
 LEGAL = frozenset('private pvt limited ltd llc inc incorporated corp corporation co company the and '
                   'llp plc sarl sas sa eurl enterprises enterprise services service'.split())
-REVERSE_FIELDS = ('rev_rank', 'rev_rrf', 'rev_score_name', 'rev_score_address', 'rev_score_anchor')
+REVERSE_FIELDS = ('rev_rank', 'rev_rrf', 'rev_score_name', 'rev_score_address', 'rev_score_anchor',
+                  'rev_score_combined', 'rev_score_phonetic')
 
 
 def core_name(name):
@@ -139,10 +141,13 @@ def merge_reverse(c, rev):
         out[k][fi] = v
     ri = np.searchsorted(keys, key_r)
     sources = {'rev_rank': 'rank', 'rev_rrf': 'rrf', 'rev_score_name': 'score_name',
-               'rev_score_address': 'score_address', 'rev_score_anchor': 'score_anchor'}
+               'rev_score_address': 'score_address', 'rev_score_anchor': 'score_anchor',
+               'rev_score_combined': 'score_combined', 'rev_score_phonetic': 'score_phonetic'}
     for k, src in sources.items():
         out[k] = np.zeros(len(keys), dtype=np.float32)
         if len(key_r):
+            if src in ('score_combined', 'score_phonetic') and src not in rev:
+                continue  # Old caches predate these routes; do not invent their scores.
             out[k][ri] = rev[src]
     return out
 
@@ -613,7 +618,7 @@ def load_scorer(model_dir, threads):
     return Scorer('lightgbm', lgb.Booster(model_file=str(model_dir / 'model.txt')), threads)
 
 
-def fit_matcher(a, x_train, y_train, x_dev, y_dev, names):
+def fit_matcher(a, x_train, y_train, x_dev, y_dev, names, train_weight=None):
     """Returns (scorer, params, best_iteration)."""
     if getattr(a, 'backend', 'lightgbm') == 'xgboost':
         import xgboost as xgb
@@ -622,7 +627,7 @@ def fit_matcher(a, x_train, y_train, x_dev, y_dev, names):
                       device=device, grow_policy='lossguide', max_depth=0, max_leaves=a.num_leaves,
                       learning_rate=a.learning_rate, subsample=0.8, colsample_bytree=0.8,
                       reg_lambda=5.0, min_child_weight=1.0, max_bin=256, seed=2026, nthread=a.threads)
-        train_set = xgb.QuantileDMatrix(x_train, y_train, feature_names=names)
+        train_set = xgb.QuantileDMatrix(x_train, y_train, feature_names=names, weight=train_weight)
         dev_set = xgb.QuantileDMatrix(x_dev, y_dev, ref=train_set, feature_names=names)
         booster = xgb.train(params, train_set, num_boost_round=a.rounds, evals=[(dev_set, 'dev')],
                             early_stopping_rounds=a.early_stopping, verbose_eval=100)
@@ -633,7 +638,7 @@ def fit_matcher(a, x_train, y_train, x_dev, y_dev, names):
                   min_data_in_leaf=a.min_data_in_leaf,
                   feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambda_l2=5.0,
                   num_threads=a.threads, verbose=-1, seed=2026)
-    train_set = lgb.Dataset(x_train, y_train, feature_name=names, free_raw_data=False)
+    train_set = lgb.Dataset(x_train, y_train, feature_name=names, free_raw_data=False, weight=train_weight)
     dev_set = lgb.Dataset(x_dev, y_dev, reference=train_set)
     booster = lgb.train(params, train_set, num_boost_round=a.rounds, valid_sets=[dev_set],
                         callbacks=[lgb.early_stopping(a.early_stopping), lgb.log_evaluation(100)])
@@ -677,7 +682,10 @@ def stage_train(a):
     pair_part = np.array([partition[s] for s in pair_ref], dtype=object)
     in_range = (x[:, names.index('fused_rank')] <= a.max_rank) if a.max_rank else np.ones(len(y), bool)
     m = {p: (pair_part == p) & in_range for p in ('train', 'dev', 'holdout')}
-    scorer, params, best_iteration = fit_matcher(a, x[m['train']], y[m['train']], x[m['dev']], y[m['dev']], names)
+    weight_power = getattr(a, 'reference_weight_power', 0.0)
+    train_weight = reference_weights(pair_ref[m['train']], weight_power) if weight_power else None
+    scorer, params, best_iteration = fit_matcher(a, x[m['train']], y[m['train']], x[m['dev']],
+                                               y[m['dev']], names, train_weight)
 
     def evaluate(p, rules):
         refs = sorted(s for s in gold if partition[s] == p)
@@ -685,16 +693,19 @@ def stage_train(a):
         idx = np.flatnonzero(m[p])
         prob = scorer.predict(x[idx])
         ref_idx = np.array([position[s] for s in pair_ref[idx]])
-        return {(rule, t): macro_score(refs, ref_idx, pair_target[idx], decide(ref_idx, prob, rule, t, len(refs)),
-                                       gold)
-                for rule, t in rules}
-    grid = [(rule, round(float(t), 3)) for rule in ('threshold', 'expected') for t in np.arange(0.05, 0.96, 0.05)]
+        return decision_grid(refs, ref_idx, pair_target[idx], prob, gold, rules)
+    threshold_step = getattr(a, 'threshold_step', 0.05)
+    if not 0 < threshold_step <= 0.1:
+        raise ValueError('threshold-step must be in (0, 0.1]')
+    grid = [(rule, round(float(t), 6)) for rule in ('threshold', 'expected')
+            for t in np.arange(0.05, 0.9500001, threshold_step)]
     dev = evaluate('dev', grid)
     best = max(dev, key=lambda k: (dev[k], k[1]))
-    holdout = evaluate('holdout', [best])[best]
+    dev_only = getattr(a, 'dev_only', False)
+    holdout = None if dev_only else evaluate('holdout', [best])[best]
     by_country = {}
     countries_path = a.pairs / 'countries.json'
-    if countries_path.exists():
+    if countries_path.exists() and not dev_only:
         countries = json.loads(countries_path.read_text())
         refs = sorted(s for s in gold if partition[s] == 'holdout')
         position = {s: i for i, s in enumerate(refs)}
@@ -715,6 +726,9 @@ def stage_train(a):
     report = {'decision': {'rule': best[0], 'threshold': best[1]}, 'keep': keep,
               'routes': report_in['parameters'].get('routes', ''),
               'macro_f05_dev': dev[best], 'macro_f05_holdout': holdout,
+              'holdout_evaluated': not dev_only,
+              'reference_weight_power': weight_power,
+              'threshold_step': threshold_step,
               'holdout_by_country': by_country,
               'dev_grid': {f'{r}@{t}': v for (r, t), v in sorted(dev.items())},
               'references': dict(Counter(partition.values())),
@@ -725,8 +739,10 @@ def stage_train(a):
               'train_refs_used': int(sum(q == 'train' for q in partition.values())),
               'feature_gain': dict(sorted(importance.items(), key=lambda kv: -kv[1])),
               'candidate_recall': report_in['candidate_recall'],
-              'note': 'Holdout scored once with the dev-selected rule. Macro F0.5 counts gold links that '
-                      'blocking missed and singleton references, so it is an end-to-end estimate.',
+              'note': ('Dev-only experiment: holdout predictions and metrics were not computed. '
+                       if dev_only else 'Holdout scored with the dev-selected rule. ') +
+                      'Macro F0.5 includes blocking misses and singleton references. '
+                      'Reference weights affect training only; dev early stopping retains unweighted logloss.',
               'seconds': time.monotonic() - started}
     (a.output / 'report.json').write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2), flush=True)
@@ -961,6 +977,10 @@ def main():
     s.add_argument('--backend', choices=['lightgbm', 'xgboost'], default='lightgbm',
                    help='xgboost trains/scores on the GPU when one is available')
     s.add_argument('--threads', type=int, default=8)
+    s.add_argument('--reference-weight-power', type=float, choices=(0.0, 0.5, 1.0), default=0.0,
+                   help='Training pair weight proportional to candidate_count(reference)^(-power)')
+    s.add_argument('--dev-only', action='store_true', help='Do not predict or score holdout')
+    s.add_argument('--threshold-step', type=float, default=0.05, help='Dev cutoff grid spacing')
     a = p.parse_args()
     if a.stage == 'pairs' and a.keep < 1:
         p.error('pairs needs --keep')
