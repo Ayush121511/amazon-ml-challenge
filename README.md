@@ -1,5 +1,8 @@
 # Amazon ML Challenge 2026
 
+## Result
+- Public leaderboard: AIR 56
+
 ## Timeline
 - Round 1: 25 Sept 2026 - 28 Sept 2026 (72 hours, dataset drops Day 1)
 - Grand Finale: 7 Oct 2026 (top 10 teams)
