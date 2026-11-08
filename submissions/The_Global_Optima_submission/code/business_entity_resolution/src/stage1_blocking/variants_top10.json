@@ -1,0 +1,11 @@
+{
+ "stage1": "artifacts/prune_v1/stage1.json",
+ "variants": [
+  {
+   "name": "top10",
+   "rule": "top",
+   "k": 10,
+   "model": "artifacts/prune_v1/model_top10"
+  }
+ ]
+}

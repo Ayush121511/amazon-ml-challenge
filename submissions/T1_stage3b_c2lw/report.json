@@ -1,0 +1,78 @@
+{
+  "late_model": "artifacts/fusion/boundary_models_c2lw",
+  "rule": [
+    "expected",
+    0.6
+  ],
+  "references": 1732544,
+  "decision": {
+    "rule": "expected",
+    "threshold": 0.6
+  },
+  "stats": {
+    "exclusivity_zeroed_pairs": 7600615,
+    "exclusivity_zeroed_pairs_above_threshold": 2721,
+    "best_prob_quantiles": {
+      "France": {
+        "0.05": 0.0009561359183862805,
+        "0.1": 0.9879687428474426,
+        "0.25": 0.9998691082000732,
+        "0.5": 0.9999805688858032
+      },
+      "India": {
+        "0.05": 7.82327879278455e-06,
+        "0.1": 0.9974528551101685,
+        "0.25": 0.9999034404754639,
+        "0.5": 0.999983549118042
+      },
+      "US": {
+        "0.05": 0.0003891659143846482,
+        "0.1": 0.9965848326683044,
+        "0.25": 0.9999593496322632,
+        "0.5": 0.9999825954437256
+      }
+    },
+    "country_thresholds": {
+      "France": 0.6,
+      "India": 0.6,
+      "US": 0.6
+    },
+    "matches": 5763967
+  },
+  "references_with_no_match": 116784,
+  "match_count_distribution": {
+    "0": 116784,
+    "1": 100718,
+    "2": 312612,
+    "3": 421694,
+    "4": 371735,
+    "5": 238723,
+    "6": 115253,
+    "7": 41926,
+    "8": 10667,
+    "9": 2268,
+    "10": 164
+  },
+  "per_country": {
+    "France": {
+      "references": 259452,
+      "no_match_rate": 0.07085703713981777,
+      "mean_matches": 3.0953933675593173,
+      "mean_candidates": 10.0
+    },
+    "India": {
+      "references": 809986,
+      "no_match_rate": 0.06521594200393586,
+      "mean_matches": 3.3437676700584946,
+      "mean_candidates": 10.0
+    },
+    "US": {
+      "references": 663106,
+      "no_match_rate": 0.06873109276646569,
+      "mean_matches": 3.396826450069823,
+      "mean_candidates": 10.0
+    }
+  },
+  "train_reference_rates": "no-match 5.6%, mean 3.46 matches per reference",
+  "seconds": 75.11393581610173
+}

@@ -1,0 +1,415 @@
+{
+ "stats": {
+  "restore_skipped_weak_name": 24894,
+  "strict_same_address_rejected_pairs": 31939,
+  "restore_identical_name": 2568,
+  "restore_skipped_other_s1_same_name": 764,
+  "restore_skipped_no_decoys_elsewhere": 327,
+  "restore_skipped_assigned_elsewhere": 291,
+  "restored": 16887,
+  "rejected": 5271,
+  "restored_p_quantiles": {
+   "0.1": 0.0,
+   "0.5": 0.002,
+   "0.9": 0.349
+  },
+  "restore_added_words": {
+   "fils": 5141,
+   "groupe": 3313,
+   "developpement": 2900,
+   "france": 1914,
+   "associes": 713,
+   "cie": 252,
+   "compagnie": 184,
+   "services": 22
+  },
+  "reject_word_pairs": {
+   "centre": 831,
+   "club": 829,
+   "comite": 788,
+   "service": 411,
+   "societe": 318,
+   "amis": 316,
+   "college": 186,
+   "federation": 184,
+   "section": 181,
+   "amicale": 172,
+   "ecole": 147,
+   "ehpad": 120,
+   "sante": 90,
+   "association": 79,
+   "sportive": 72
+  },
+  "reject_p_quantiles": {
+   "0.1": 0.868,
+   "0.5": 0.99,
+   "0.9": 1.0
+  }
+ },
+ "examples": {
+  "restore": [
+   [
+    "S1-674359370",
+    [
+     "Afrique Comite (France)",
+     "38 Avenue Chanzy, Nantes, Pays de la Loire"
+    ],
+    "S2-22273676",
+    [
+     "Afrique Comite (France) EURL",
+     "38 ATENUE CHANZY, Pays de la Loire, NANTES"
+    ]
+   ],
+   [
+    "S1-887019587",
+    [
+     "Cigale & Cie SASU",
+     "16 RUE de Pas, Restaurant Clement Marot, Lille, Hauts-de-France"
+    ],
+    "S2-671054275",
+    [
+     "Cigale & SASU Groupe",
+     "16 RUE DE PAS, RESTAURANT CLEMENT MAROT, LILLE"
+    ]
+   ],
+   [
+    "S1-161811997",
+    [
+     "Club de Culinaire",
+     "670 ter Avenue Vulcain, La Teste-de-Buch, Nouvelle-Aquitaine"
+    ],
+    "S2-971216115",
+    [
+     "Club de Culinaire & Fils",
+     "670 TER AVENUE VULCAIN, LA TESTE-DE-BUCH, Gironde"
+    ]
+   ],
+   [
+    "S1-947162374",
+    [
+     "Association de Palais",
+     "301 Avenue Guillain, Dunkerque, Hauts-de-France"
+    ],
+    "S2-369587541",
+    [
+     "ASSOCIATION DE PALAIS EURL",
+     "Nord, 301 AVENUE GUILLAIN, DUNKERQUE"
+    ]
+   ],
+   [
+    "S1-958724839",
+    [
+     "Union de Reunis",
+     "13 Rue Gassendi, Lille, Hauts-de-France"
+    ],
+    "S3-593463474",
+    [
+     "Union de Reunis EURL",
+     "13 R Gassendi, Lille"
+    ]
+   ],
+   [
+    "S1-357647797",
+    [
+     "Pharmacie de la Orange",
+     "5 Allée Laure Diebold, Nantes, Pays de la Loire"
+    ],
+    "S3-936960542",
+    [
+     "Pharmacie de la Orange EURL",
+     "Nº 5 Allée Laure Diebold, Nantes, Pays de la Loire"
+    ]
+   ],
+   [
+    "S1-280785954",
+    [
+     "Amicale du Sapeurs",
+     "526 Route de Saint Joseph, Nantes, Pays de la Loire"
+    ],
+    "S3-716787515",
+    [
+     "Amicale du Sapeurs & Fils",
+     "526 Rte De Saint Joseph, Nantes"
+    ]
+   ],
+   [
+    "S1-640438919",
+    [
+     "Maison Enseignement SARL",
+     "45 Rue Minvielle, Bordeaux, Nouvelle-Aquitaine"
+    ],
+    "S3-36483769",
+    [
+     "Maison Enseignement-SARL & Fils",
+     "45 R. Minvielle, Bordeaux"
+    ]
+   ],
+   [
+    "S1-10427528",
+    [
+     "Amicale du Ensemble",
+     "7 Rue Joliot Curie, La Teste-de-Buch, Nouvelle-Aquitaine"
+    ],
+    "S2-929180076",
+    [
+     "Amicale du Ensemble Groupe",
+     "Nº 7 RUE JOLIOT CURIE, LA TESTE-DE-BUCH, Gironde"
+    ]
+   ],
+   [
+    "S1-230346694",
+    [
+     "Excellence Centre SARL",
+     "197 Rue de Bègles, Bordeaux, Nouvelle-Aquitaine"
+    ],
+    "S3-950894836",
+    [
+     "Excellence SARL  Développement",
+     "197 Rue De Bègles, Bordeaux, Gironde"
+    ]
+   ],
+   [
+    "S1-434204000",
+    [
+     "Établissements Commercants SARL",
+     "Pessac, Nouvelle-Aquitaine, 7 Rue de la Marne"
+    ],
+    "S2-955517097",
+    [
+     "Établissements Commercants SARL Groupe",
+     "#7 R. DE LA MARNE, PESSAC, Gironde"
+    ]
+   ],
+   [
+    "S1-809875988",
+    [
+     "Deleves & Cie SAS",
+     "110 A2 Rue du Chevalier Français, Lille, Hauts-de-France"
+    ],
+    "S2-834366540",
+    [
+     "Deleves + Cie SA",
+     "110 A9 RUE DU CHEVALIER FRANCAIS, LILLE, Nord"
+    ]
+   ],
+   [
+    "S1-770155268",
+    [
+     "Collège de Tip",
+     "38 Avenue du Merle, Lège-Cap-Ferret, Nouvelle-Aquitaine"
+    ],
+    "S2-359066343",
+    [
+     "Collège de Tip Groupe",
+     "38 AVE DU MERLE, LEGE-CAP-FERRET, Nouvelle-Aquitaine"
+    ]
+   ],
+   [
+    "S1-775180158",
+    [
+     "Creativite Pharmacie SARL",
+     "Nantes, Pays de la Loire, 3 Rue de la Grange au Loup"
+    ],
+    "S3-933204518",
+    [
+     "Creativite SARL Groupe",
+     "3 Rue De La Grange Au Loup, Nantes"
+    ]
+   ],
+   [
+    "S1-398516775",
+    [
+     "Breuil Amicale SARL",
+     "40 Rue d' Anvers, Tourcoing, Hauts-de-France"
+    ],
+    "S2-735382642",
+    [
+     "Breuil Groupe",
+     "40 R. D' ANVERS, TOURCOING"
+    ]
+   ]
+  ],
+  "reject": [
+   [
+    "S1-711695589",
+    [
+     "Vauclin Fatshi Primaire SA",
+     "7 Avenue de Saige, Pessac, Nouvelle-Aquitaine"
+    ],
+    "S2-496601718",
+    [
+     "Vauclin SA Club Fatshi",
+     "7 AVENUE DE SAIEE, PESSAC, Gironde"
+    ]
+   ],
+   [
+    "S1-13027075",
+    [
+     "VQP Sport",
+     "6 Rue Dominique Chateigner, Nantes, Pays de la Loire"
+    ],
+    "S3-546906485",
+    [
+     "VQP CLUB",
+     "6 R Dominique Chaetigner, Nantes, Pays de la Loire"
+    ]
+   ],
+   [
+    "S1-797323493",
+    [
+     "Festival Societe SAS",
+     "146 RUE Leo Saignat, Bordeaux, Nouvelle-Aquitaine, Universite de Bordeaux Case 60"
+    ],
+    "S2-852642239",
+    [
+     "Festival Centre SAS",
+     "146 RUE LEO SAIGNAT, UNIVERSITE DE BORDEAUX CASE 60, BORDEAUX, Gironde"
+    ]
+   ],
+   [
+    "S1-41538219",
+    [
+     "TZZ Comite SAS",
+     "36 Rue Béranger, La Teste-de-Buch, Nouvelle-Aquitaine"
+    ],
+    "S3-351657183",
+    [
+     "TZZ Club SAS",
+     "Gironde, La Teste-de-buch, Nº 36 Rue Béranger"
+    ]
+   ],
+   [
+    "S1-128067383",
+    [
+     "Wes Sport (France) EURL",
+     "19 Avenue Claude Bernard, Saint-Herblain, Pays de la Loire"
+    ],
+    "S2-47813330",
+    [
+     "EURL WES CENTRE (FRANCE)",
+     "NO 19 AVE CLAUDE BERNARD, Saint-Herblain, Loire-Atlantique"
+    ]
+   ],
+   [
+    "S1-622730569",
+    [
+     "Gite Sport",
+     "5 RUE du Pre Nian, Nantes, Pays de la Loire"
+    ],
+    "S3-908667453",
+    [
+     "Gite Comite",
+     "5 - R. Du Pre Nian, Nantes, Loire-Atlantique"
+    ]
+   ],
+   [
+    "S1-168484951",
+    [
+     "Donneurs Amis (France) SARL",
+     "1 Rue Esquermoise, Hauts-de-France, Lille"
+    ],
+    "S2-811660709",
+    [
+     "Donneurs Amicale (France) Sàrl",
+     "001 RUE ESQUEROISE, LILLE"
+    ]
+   ],
+   [
+    "S1-229093129",
+    [
+     "Lune College SAS",
+     "87 Avenue Pierre Corneille, Pessac, Nouvelle-Aquitaine"
+    ],
+    "S2-620564039",
+    [
+     "Lune Ecole",
+     "87 AVENUE PIERRE CORNEILLE, PESSAC"
+    ]
+   ],
+   [
+    "S1-132674673",
+    [
+     "Fleur Anciens SARL",
+     "4 Impasse du Val de Sèvre, Nantes, Pays de la Loire"
+    ],
+    "S2-154604859",
+    [
+     "Fleur Centre SARL",
+     "N° 4 IMPASSE DU VAL DE SÈVRE, NANTES, Pays de la Loire"
+    ]
+   ],
+   [
+    "S1-61559143",
+    [
+     "Point Culturel EURL",
+     "13 Clos Pottier, Lille, Hauts-de-France"
+    ],
+    "S2-485621291",
+    [
+     "Point EURL Club",
+     "13 CLOS POTTIER, LILLE"
+    ]
+   ],
+   [
+    "S1-507915355",
+    [
+     "Sociale Entreprises Ecole SAS",
+     "4 RUE du Chapeau Rouge, Nantes, Pays de la Loire"
+    ],
+    "S2-311594761",
+    [
+     "Sociale Entreprises Comite Sas",
+     "4 RUE DU CHAPEAU ROUGE, NANTES"
+    ]
+   ],
+   [
+    "S1-207677170",
+    [
+     "Poney Quelque Loisirs SARL",
+     "Hauts-de-France, 9 Rue d'Amsterdam, Calais"
+    ],
+    "S2-219893329",
+    [
+     "Poney Quelque  Centre SARL",
+     "9 RUE D'AMSTREDAM, CALAIS, Pas-de-Calais"
+    ]
+   ],
+   [
+    "S1-330753425",
+    [
+     "Ferme Voyageurs Foyer SAS",
+     "3 La Boutière, Pornic, Pays de la Loire"
+    ],
+    "S3-757072082",
+    [
+     "FERME VOYAGEURS SERVICE SAS",
+     "3 La Boutiere, Pornic, Pays de la Loire"
+    ]
+   ],
+   [
+    "S1-693404564",
+    [
+     "Nantes Fetes",
+     "3 Boulevard des Batignolles, Nantes, Pays de la Loire"
+    ],
+    "S3-633643546",
+    [
+     "Nantes Service",
+     "Nº 3 Bd Des Batignolles, Nantes"
+    ]
+   ],
+   [
+    "S1-91422561",
+    [
+     "Publique (France) Fetes SARL",
+     "2 t Allée du Clos d’Alice, La Teste-de-Buch, Nouvelle-Aquitaine"
+    ],
+    "S3-797962329",
+    [
+     "Publique (France) Federation SARL",
+     "2 T All. Du Clos D’alice, La Teste-de-buch, Nouvelle-Aquitaine"
+    ]
+   ]
+  ]
+ }
+}

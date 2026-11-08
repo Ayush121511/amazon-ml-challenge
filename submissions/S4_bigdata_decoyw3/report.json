@@ -1,0 +1,78 @@
+{
+  "late_model": "/home/scai/mtech/aib262015/scratch/amazon_ml_2026/artifacts/fusion/decoy_big/L2_decoy_w3",
+  "rule": [
+    "expected",
+    0.78
+  ],
+  "references": 1732544,
+  "decision": {
+    "rule": "expected",
+    "threshold": 0.78
+  },
+  "stats": {
+    "exclusivity_zeroed_pairs": 7600615,
+    "exclusivity_zeroed_pairs_above_threshold": 7202,
+    "best_prob_quantiles": {
+      "France": {
+        "0.05": 0.038018882274627686,
+        "0.1": 0.9997500777244568,
+        "0.25": 0.9999558925628662,
+        "0.5": 0.9999876022338867
+      },
+      "India": {
+        "0.05": 0.0015737045323476195,
+        "0.1": 0.999847412109375,
+        "0.25": 0.9999558925628662,
+        "0.5": 0.9999876022338867
+      },
+      "US": {
+        "0.05": 0.009937342256307602,
+        "0.1": 0.9998251795768738,
+        "0.25": 0.999954104423523,
+        "0.5": 0.9999862909317017
+      }
+    },
+    "country_thresholds": {
+      "France": 0.78,
+      "India": 0.78,
+      "US": 0.78
+    },
+    "matches": 5767683
+  },
+  "references_with_no_match": 101405,
+  "match_count_distribution": {
+    "0": 101405,
+    "1": 112265,
+    "2": 318544,
+    "3": 426913,
+    "4": 369580,
+    "5": 235637,
+    "6": 112414,
+    "7": 42041,
+    "8": 11561,
+    "9": 2013,
+    "10": 171
+  },
+  "per_country": {
+    "France": {
+      "references": 259452,
+      "no_match_rate": 0.06121363489200315,
+      "mean_matches": 3.195396450981299,
+      "mean_candidates": 10.0
+    },
+    "India": {
+      "references": 809986,
+      "no_match_rate": 0.058055324413014545,
+      "mean_matches": 3.351373974364989,
+      "mean_candidates": 10.0
+    },
+    "US": {
+      "references": 663106,
+      "no_match_rate": 0.05805859093417945,
+      "mean_matches": 3.3540112742155856,
+      "mean_candidates": 10.0
+    }
+  },
+  "train_reference_rates": "no-match 5.6%, mean 3.46 matches per reference",
+  "seconds": 69.03776601795107
+}
