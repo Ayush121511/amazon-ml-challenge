@@ -20,7 +20,9 @@ VISHAL = Path('/home/scai/mtech/aib262467/scratch/amazon_ml_2026/artifacts')
 FUS = HOME / 'scratch/amazon_ml_2026/artifacts/fusion'
 CE = HOME / 'scratch/amazon_ml_2026/artifacts/cross_encoder_v1'
 TAGS = [t for t in os.environ.get('TAGS', 'e5small_f').split(',') if t]
-OOF_CONFIGS = os.environ.get('OOF_CONFIGS', 'all,base+all_ce,base+ce_mdeberta_drop0').split(',')
+DECOY_W = [float(w) for w in os.environ.get('DECOY_W', '2,3').split(',') if w]
+RAWTR = HOME / 'scratch/amazon_ml_2026/data/dataset/train'
+OOF_CONFIGS = os.environ.get('OOF_CONFIGS', 'all,base+all_ce,base+ce_mdeberta_drop0,all_decoyw3').split(',')
 
 
 def log(*a):
@@ -87,6 +89,21 @@ def main():
     params = dict(objective='binary:logistic', eval_metric='logloss', tree_method='hist', device='cuda',
                   grow_policy='lossguide', max_depth=0, max_leaves=255, learning_rate=0.05, subsample=0.8,
                   colsample_bytree=0.8, reg_lambda=5.0, min_child_weight=1.0, max_bin=256, seed=2026)
+    owned = set()
+    with open(RAWTR / 'train_ground_truth.tsv', encoding='utf-8') as fh:
+        next(fh)
+        for line in fh:
+            q = line.rstrip('\n').split('\t')
+            if len(q) > 1 and q[1]:
+                owned.update(t.strip() for t in q[1].split(','))
+    decoy = (y == 0) & np.array([t not in owned for t in tgts])
+    weights = {1.0: None}
+    for w in DECOY_W:
+        weights[w] = np.where(decoy, w, 1.0).astype(np.float32)
+    for base_name in ('all', 'base+all_ce'):
+        if base_name in configs:
+            for w in DECOY_W:
+                configs[f'{base_name}_decoyw{w:g}'] = configs[base_name]
     grid = [(ru, round(float(t), 2)) for ru in ('expected', 'threshold') for t in np.arange(0.3, 0.96, 0.025)]
     idx = {p: np.flatnonzero(part == p) for p in ('train', 'dev', 'holdout')}
     prefs = {p: sorted(s for s in gold if partition[s] == p) for p in ('dev', 'holdout')}
@@ -102,7 +119,9 @@ def main():
     results = {'tags': TAGS}
     for name, keys in configs.items():
         F = np.column_stack([feats[k] for k in keys]).astype(np.float32)
-        dtr = xgb.QuantileDMatrix(F[idx['train']], y[idx['train']])
+        wname = float(name.split('_decoyw')[1]) if '_decoyw' in name else 1.0
+        wt = weights[wname]
+        dtr = xgb.QuantileDMatrix(F[idx['train']], y[idx['train']], weight=None if wt is None else wt[idx['train']])
         ddv = xgb.QuantileDMatrix(F[idx['dev']], y[idx['dev']], ref=dtr)
         bst = xgb.train(params, dtr, 4000, evals=[(ddv, 'dev')], early_stopping_rounds=100, verbose_eval=False)
         it = (0, bst.best_iteration + 1)
@@ -127,7 +146,8 @@ def main():
             fk = np.array([int(hashlib.sha256((r + '#oof').encode()).hexdigest()[:8], 16) % 5 for r in refs[tr]])
             for k in range(5):
                 fit, prd = tr[fk != k], tr[fk == k]
-                b = xgb.train(params, xgb.QuantileDMatrix(F[fit], y[fit]), bst.best_iteration + 1)
+                b = xgb.train(params, xgb.QuantileDMatrix(F[fit], y[fit], weight=None if wt is None else wt[fit]),
+                              bst.best_iteration + 1)
                 oof[prd] = b.inplace_predict(F[prd])
             full = np.full(len(rows), np.nan, dtype=np.float32)
             full[idx['train']] = oof[idx['train']]

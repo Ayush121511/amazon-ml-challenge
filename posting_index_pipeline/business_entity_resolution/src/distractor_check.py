@@ -14,7 +14,6 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
 import xgboost as xgb
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -145,10 +144,13 @@ def main():
     need = set(refs[ev]) | set(tgts[ev])
     text = {}
     for src in ('train_source1.tsv', 'train_source2.tsv', 'train_source3.tsv'):
-        df = pd.read_csv(RAW / src, sep='\t', dtype=str, keep_default_na=False, quoting=3)
-        df = df[df.entity_id.isin(need)]
-        for e, n, a in zip(df.entity_id, df.business_name, df.business_address):
-            text[e] = f'{n} | {a}'
+        with open(RAW / src, encoding='utf-8') as fh:
+            head = fh.readline().rstrip('\n').split('\t')
+            ie, iname, iaddr = head.index('entity_id'), head.index('business_name'), head.index('business_address')
+            for line in fh:
+                p = line.rstrip('\n').split('\t')
+                if len(p) > iaddr and p[ie] in need:
+                    text[p[ie]] = f'{p[iname]} | {p[iaddr]}'
     L = [text.get(r, ' | ') for r in refs[ev]]
     Rt = [text.get(t, ' | ') for t in tgts[ev]]
     md = CE / 'mdeberta_drop0/model'

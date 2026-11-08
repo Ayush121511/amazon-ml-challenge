@@ -10,7 +10,6 @@ from pathlib import Path
 
 import os
 import numpy as np
-import pandas as pd
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -51,9 +50,13 @@ def read_pairs(cand_file, shard=None):
 def load_text():
     text = {}
     for src in ('test_source1.tsv', 'test_source2.tsv', 'test_source3.tsv'):
-        df = pd.read_csv(RAW / src, sep='\t', dtype=str, keep_default_na=False, quoting=3)
-        for e, nm, ad in zip(df.entity_id, df.business_name, df.business_address):
-            text[e] = f'{nm} | {ad}'
+        with open(RAW / src, encoding='utf-8') as fh:
+            head = fh.readline().rstrip('\n').split('\t')
+            ie, iname, iaddr = head.index('entity_id'), head.index('business_name'), head.index('business_address')
+            for line in fh:
+                q = line.rstrip('\n').split('\t')
+                if len(q) > iaddr:
+                    text[q[ie]] = f'{q[iname]} | {q[iaddr]}'
     return text
 
 

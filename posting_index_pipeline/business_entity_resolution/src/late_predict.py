@@ -64,18 +64,27 @@ def score(a):
     position = {r['entity_id']: i for i, r in enumerate(refs)}
     ref_idx = np.array([position[r] for r in refs_arr], dtype=np.int64)
 
-    s1 = pair_lookup(sorted(glob.glob(a.stage1_scores)), refs_arr, tgts, 'prob')
-    log('stage-1 probabilities found for', int((~np.isnan(s1)).sum()), 'of', len(s1))
+    s1_files = sorted({p for pat in a.stage1_scores.split(';') for p in glob.glob(pat)})
+    log('stage-1 files', s1_files)
+    s1 = pair_lookup(s1_files, refs_arr, tgts, 'prob')
+    found = int((~np.isnan(s1)).sum())
+    log('stage-1 probabilities found for', found, 'of', len(s1))
+    # Vishal's saved scores drop pairs below 0.02 (treated as 0), so ~45% coverage is normal; 0 means broken paths.
+    if len(s1_files) < 2 or found < 0.25 * len(s1):
+        raise SystemExit(f'ABORT: {len(s1_files)} stage-1 files, probabilities found for {found}/{len(s1)} pairs')
     s1f = np.nan_to_num(s1, nan=0.0)
     s1f = np.where(s1f < 0.02, 0.0, s1f)
     ce = np.zeros(len(tgts))
-    ce_files = sorted(glob.glob(a.ce_scores))
+    ce_files = sorted({p for pat in a.ce_scores.split(';') for p in glob.glob(pat)})
     names = sorted({Path(f).name.split('_shard')[0] for f in ce_files})
     for nm in names:
         ce += np.nan_to_num(pair_lookup([f for f in ce_files if Path(f).name.startswith(nm + '_shard')],
                                         refs_arr, tgts, 'logit'), nan=-20.0)
     ce /= max(1, len(names))
-    log('cross-encoder models averaged:', names)
+    log('cross-encoder models averaged:', names, 'files', ce_files)
+    missing = int((ce <= -20 * 0.999).sum())
+    if not names or missing > 0.1 * len(ce):
+        raise SystemExit(f'ABORT: cross-encoder scores missing for {missing}/{len(ce)} pairs')
 
     if cfg['name'].startswith('L2'):
         X = np.column_stack([s1f, ce]).astype(np.float32)

@@ -20,8 +20,8 @@ V4 = HOME / 'scratch/vishal_v4_artifacts'
 VISHAL = Path('/home/scai/mtech/aib262467/scratch/amazon_ml_2026/artifacts')
 RAW = HOME / 'scratch/amazon_ml_2026/data/dataset/train'
 OUT = HOME / 'scratch/amazon_ml_2026/artifacts/matcher_eda'
-SET = sys.argv[1] if len(sys.argv) > 1 else 'top10'
-NTHREAD = int(sys.argv[2]) if len(sys.argv) > 2 else 8
+SET = sys.argv[1] if __name__ == '__main__' and len(sys.argv) > 1 else 'top10'
+NTHREAD = int(sys.argv[2]) if __name__ == '__main__' and len(sys.argv) > 2 else 8
 
 KEY_FEATURES = ['name_folded_token_sort', 'name_folded_jaro_winkler', 'name_exact', 'name_core_token_set',
                 'name_translit_ratio', 'address_folded_token_set', 'address_exact', 'address_numbers_token_set',
